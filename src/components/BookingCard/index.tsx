@@ -16,7 +16,7 @@ interface BookingCardProps {
 
 const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onEdit, showActions = true }) => {
   const canEdit = booking.status === 'pending';
-  const canCancel = ['pending', 'approved'].includes(booking.status);
+  const canCancel = ['pending', 'approved', 'queuing'].includes(booking.status);
 
   const handleCancel = () => {
     Taro.showModal({

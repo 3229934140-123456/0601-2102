@@ -75,6 +75,18 @@ const ShipPage: React.FC = () => {
     }
   }, [currentShipId, selectedShipId]);
 
+  // 选中船舶变化时，自动初始化照片和特殊货物说明（含首次加载、切换、刷新后重入）
+  useEffect(() => {
+    if (selectedShip && !isEditing) {
+      setCertPhotos(
+        selectedShip.certificatePhoto
+          ? [selectedShip.certificatePhoto]
+          : selectedShip.photos?.slice(0, 3) || []
+      );
+      setSpecialCargo(selectedShip.specialCargo || '');
+    }
+  }, [selectedShip?.id, isEditing]);
+
   const handleShipSelect = (ship: Ship) => {
     if (isEditing) {
       Taro.showModal({

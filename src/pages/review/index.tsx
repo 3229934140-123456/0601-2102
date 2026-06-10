@@ -36,7 +36,7 @@ const ReviewPage: React.FC = () => {
     { key: 'pending', label: '待审核' },
     { key: 'approved', label: '排队中' },
     { key: 'passed', label: '已过闸' },
-    { key: 'rejected', label: '已退回' },
+    { key: 'rejected', label: '已拒绝' },
     { key: 'stats', label: '统计' },
   ];
 
@@ -75,6 +75,9 @@ const ReviewPage: React.FC = () => {
       return acc;
     }, base);
   }, [dateBookings, selectedDate]);
+
+  // 已通过总数 = 所有审核通过过的（queuing 正在排队 + passed 已过闸）
+  const approvedCount = dailyStats.queuing + dailyStats.passed;
 
   // 按日期过滤的爽约名单
   const dateNoShowItems = useMemo(() => {
@@ -173,14 +176,22 @@ const ReviewPage: React.FC = () => {
 
   const handleDateChange = () => {
     const options: string[] = [];
-    for (let i = 0; i < 10; i++) {
-      const d = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
-      options.push(i === 0 ? `今天 (${d})` : i === 1 ? `昨天 (${d})` : d);
+    const dateList: string[] = [];
+    for (let i = -7; i <= 7; i++) {
+      const d = dayjs().add(i, 'day');
+      const dStr = d.format('YYYY-MM-DD');
+      dateList.push(dStr);
+      if (i === 0) options.push(`今天 (${dStr})`);
+      else if (i === -1) options.push(`昨天 (${dStr})`);
+      else if (i === 1) options.push(`明天 (${dStr})`);
+      else if (i === 2) options.push(`后天 (${dStr})`);
+      else if (i < 0) options.push(`${-i}天前 (${dStr})`);
+      else options.push(`${i}天后 (${dStr})`);
     }
     Taro.showActionSheet({
       itemList: options,
       success: (res) => {
-        const newDate = dayjs().subtract(res.tapIndex, 'day').format('YYYY-MM-DD');
+        const newDate = dateList[res.tapIndex];
         setSelectedDate(newDate);
         Taro.showToast({ title: `已切换到 ${newDate}`, icon: 'none' });
       },
@@ -222,8 +233,8 @@ const ReviewPage: React.FC = () => {
             <Text className={styles.statLabel}>今日预约</Text>
           </View>
           <View className={styles.statCard}>
-            <Text className={styles.statValue}>{dailyStats.approved + dailyStats.queuing}</Text>
-            <Text className={styles.statLabel}>排队中</Text>
+            <Text className={styles.statValue}>{approvedCount}</Text>
+            <Text className={styles.statLabel}>已通过</Text>
           </View>
           <View className={styles.statCard}>
             <Text className={styles.statValue}>{dailyStats.pending}</Text>
@@ -231,7 +242,7 @@ const ReviewPage: React.FC = () => {
           </View>
           <View className={styles.statCard}>
             <Text className={styles.statValue}>{dailyStats.rejected}</Text>
-            <Text className={styles.statLabel}>已退回</Text>
+            <Text className={styles.statLabel}>已拒绝</Text>
           </View>
         </View>
       </View>
