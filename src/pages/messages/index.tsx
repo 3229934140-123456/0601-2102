@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Button, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import classnames from 'classnames';
 import { useAppStore } from '@/store/appStore';
-import { mockMessages } from '@/data/messages';
 import { Message, MessageType } from '@/types';
-import MessageItem from '@/components/MessageItem';
 import { formatTime, messageTypeMap } from '@/utils';
 import styles from './index.module.scss';
 
 const MessagesPage: React.FC = () => {
-  const { messages, addMessage, markMessageAsRead, markAllMessagesAsRead } = useAppStore();
+  const { messages, markMessageAsRead, markAllMessagesAsRead } = useAppStore();
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [seedLoaded, setSeedLoaded] = useState(false);
 
   const filters = [
     { key: 'all', label: '全部' },
@@ -25,41 +24,52 @@ const MessagesPage: React.FC = () => {
     { key: 'review', label: '审核' },
   ];
 
-  const loadData = useCallback(() => {
-    if (messages.length === 0) {
-      useAppStore.setState({ messages: mockMessages });
+  const seedData = useCallback(() => {
+    if (seedLoaded) return;
+    const state = useAppStore.getState();
+    if (state.messages.length === 0) {
+      import('@/data/messages').then(({ mockMessages }) => {
+        useAppStore.setState({ messages: mockMessages });
+      });
     }
-  }, [messages.length]);
+    if (state.bookings.length === 0) {
+      import('@/data/booking').then(({ mockBookings }) => {
+        useAppStore.setState({ bookings: mockBookings });
+      });
+    }
+    setSeedLoaded(true);
+  }, [seedLoaded]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    seedData();
+  }, [seedData]);
 
   useDidShow(() => {
-    loadData();
+    seedData();
   });
 
   const onRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      loadData();
       setIsRefreshing(false);
       Taro.stopPullDownRefresh();
       Taro.showToast({ title: '已刷新', icon: 'success' });
-    }, 1000);
+    }, 800);
   };
 
   useEffect(() => {
-    if (isRefreshing) {
-      onRefresh();
-    }
+    if (isRefreshing) onRefresh();
   }, [isRefreshing]);
 
-  const displayMessages = activeFilter === 'all'
-    ? messages
-    : messages.filter((m) => m.type === activeFilter);
+  const displayMessages = useMemo(
+    () => (activeFilter === 'all' ? messages : messages.filter((m) => m.type === activeFilter)),
+    [activeFilter, messages]
+  );
 
-  const unreadCount = messages.filter((m) => !m.isRead).length;
+  const unreadCount = useMemo(
+    () => messages.filter((m) => !m.isRead).length,
+    [messages]
+  );
 
   const getUnreadCountByType = (type: string) => {
     if (type === 'all') return unreadCount;
@@ -74,7 +84,7 @@ const MessagesPage: React.FC = () => {
     setShowDetail(true);
   };
 
-  const handleToggleExpand = (messageId: string, e: React.MouseEvent) => {
+  const handleToggleExpand = (messageId: string, e: any) => {
     e.stopPropagation();
     setExpandedId(expandedId === messageId ? null : messageId);
   };
@@ -186,7 +196,16 @@ const MessagesPage: React.FC = () => {
                     {formatTime(message.createTime, 'MM-DD HH:mm')}
                   </Text>
                 </View>
-                <Text className={styles.messageDesc}>{message.content}</Text>
+                <Text
+                  className={styles.messageDesc}
+                  style={
+                    expandedId !== message.id && message.content.length > 60
+                      ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden' }
+                      : undefined
+                  }
+                >
+                  {message.content}
+                </Text>
                 {message.content.length > 60 && (
                   <Text
                     className={styles.expandHint}

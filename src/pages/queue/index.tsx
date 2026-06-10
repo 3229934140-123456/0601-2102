@@ -1,60 +1,102 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import classnames from 'classnames';
 import { useAppStore } from '@/store/appStore';
-import { mockQueueItems } from '@/data/queue';
 import { mockBookings } from '@/data/booking';
 import { QueueItem, Booking } from '@/types';
 import { formatTime } from '@/utils';
 import styles from './index.module.scss';
 
 const QueuePage: React.FC = () => {
-  const { queueItems, setQueueItems, bookings } = useAppStore();
+  const {
+    queueItems,
+    bookings,
+    ships,
+    currentShipId,
+    getCurrentShip,
+    refreshQueueFromBookings,
+  } = useAppStore();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [seedLoaded, setSeedLoaded] = useState(false);
 
-  const loadData = useCallback(() => {
-    if (queueItems.length === 0) {
-      setQueueItems(mockQueueItems);
+  const seedData = useCallback(() => {
+    if (seedLoaded) return;
+    const state = useAppStore.getState();
+    const patch: Record<string, unknown> = {};
+    if (state.bookings.length === 0) patch.bookings = mockBookings;
+    if (state.ships.length === 0) {
+      import('@/data/ship').then(({ mockShipList }) => {
+        useAppStore.setState({
+          ships: mockShipList,
+          currentShipId: mockShipList[0].id,
+        });
+      });
     }
-    if (bookings.length === 0) {
-      useAppStore.setState({ bookings: mockBookings });
+    if (Object.keys(patch).length > 0) {
+      useAppStore.setState(patch);
     }
-    setLastUpdate(new Date());
-  }, [queueItems.length, bookings.length, setQueueItems]);
+    setTimeout(() => useAppStore.getState().refreshQueueFromBookings(), 0);
+    setSeedLoaded(true);
+  }, [seedLoaded]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    seedData();
+  }, [seedData]);
 
   useDidShow(() => {
-    loadData();
+    seedData();
+    setTimeout(() => useAppStore.getState().refreshQueueFromBookings(), 0);
+    setLastUpdate(new Date());
   });
 
   const onRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      loadData();
+      useAppStore.getState().refreshQueueFromBookings();
+      setLastUpdate(new Date());
       setIsRefreshing(false);
       Taro.stopPullDownRefresh();
       Taro.showToast({ title: '已刷新', icon: 'success' });
-    }, 1000);
+    }, 800);
   };
 
   useEffect(() => {
-    if (isRefreshing) {
-      onRefresh();
-    }
+    if (isRefreshing) onRefresh();
   }, [isRefreshing]);
 
-  const sortedQueue = [...queueItems].sort((a, b) => a.queueNumber - b.queueNumber);
-  const currentQueue = sortedQueue.find((q) => q.shipName === '长江之星');
+  const currentShip = useMemo(() => getCurrentShip(), [getCurrentShip, ships, currentShipId]);
+  const sortedQueue = useMemo(
+    () => [...queueItems].sort((a, b) => a.queueNumber - b.queueNumber),
+    [queueItems]
+  );
+
+  const currentQueue = sortedQueue.find(
+    (q) => currentShip && q.shipName === currentShip.name
+  );
   const showAlert = currentQueue && currentQueue.queueNumber <= 3;
 
-  const passedBookings = bookings.filter((b) => b.status === 'passed' || b.status === 'released');
-  const sortedHistory = [...passedBookings].sort(
-    (a, b) => new Date(b.expectedArrivalTime).getTime() - new Date(a.expectedArrivalTime).getTime()
+  const passedBookings = useMemo(
+    () =>
+      bookings.filter(
+        (b) =>
+          b.status === 'passed' ||
+          b.status === 'released' ||
+          b.status === 'cancelled' ||
+          b.status === 'rejected'
+      ),
+    [bookings]
+  );
+  const sortedHistory = useMemo(
+    () =>
+      [...passedBookings].sort(
+        (a, b) =>
+          new Date(b.expectedArrivalTime).getTime() -
+          new Date(a.expectedArrivalTime).getTime()
+      ),
+    [passedBookings]
   );
 
   const formatWaitTime = (minutes: number) => {
@@ -73,15 +115,25 @@ const QueuePage: React.FC = () => {
     return 'normal';
   };
 
+  const getHistoryStatus = (status: Booking['status']) => {
+    const map: Record<string, string> = {
+      passed: '已过闸',
+      released: '已放行',
+      cancelled: '已取消',
+      rejected: '已退回',
+    };
+    return map[status] || '已完成';
+  };
+
   return (
     <View className={styles.page}>
-      {showAlert && (
+      {showAlert && currentShip && (
         <View className={styles.alertBanner}>
           <View className={styles.alertIcon}>
             <Text className={styles.alertIconText}>!</Text>
           </View>
           <Text className={styles.alertText}>
-            即将轮到您的船舶「长江之星」，请做好过闸准备！
+            即将轮到您的船舶「{currentShip.name}」，请做好过闸准备！
           </Text>
         </View>
       )}
@@ -128,7 +180,9 @@ const QueuePage: React.FC = () => {
               </View>
               <View className={styles.infoItem}>
                 <Text className={styles.infoLabel}>前方等待</Text>
-                <Text className={styles.infoValue}>{currentQueue.queueNumber - 1}艘</Text>
+                <Text className={styles.infoValue}>
+                  {Math.max(0, currentQueue.queueNumber - 1)}艘
+                </Text>
               </View>
             </View>
           </View>
@@ -139,7 +193,7 @@ const QueuePage: React.FC = () => {
                 <Text className={styles.emptyIconText}>🚢</Text>
               </View>
               <Text className={styles.emptyText}>当前没有排队中的预约</Text>
-              <Text className={styles.emptyDesc}>请先提交预约申请</Text>
+              <Text className={styles.emptyDesc}>请先提交预约申请，审核通过后自动入队</Text>
             </View>
           </View>
         )}
@@ -156,11 +210,14 @@ const QueuePage: React.FC = () => {
                   key={item.id}
                   className={classnames(
                     styles.queueItem,
-                    item.shipName === '长江之星' && styles.current
+                    currentShip && item.shipName === currentShip.name && styles.current
                   )}
                 >
                   <View
-                    className={classnames(styles.queueRank, styles[getRankClass(item.queueNumber)])}
+                    className={classnames(
+                      styles.queueRank,
+                      styles[getRankClass(item.queueNumber)]
+                    )}
                   >
                     <Text
                       className={classnames(
@@ -208,7 +265,7 @@ const QueuePage: React.FC = () => {
                   </View>
                   <View className={styles.historyRight}>
                     <Text className={styles.historyStatus}>
-                      {booking.status === 'passed' ? '已过闸' : '已放行'}
+                      {getHistoryStatus(booking.status)}
                     </Text>
                     <Text className={styles.historyTime}>
                       {booking.actualPassTime

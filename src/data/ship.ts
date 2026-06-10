@@ -1,25 +1,54 @@
-import { Ship } from '@/types';
+import { Ship, ShipCertificate } from '@/types';
 
-export const mockShip: Ship = {
-  id: 'ship001',
-  name: '长江之星',
-  mmsi: '413987654',
-  callSign: 'BXYZ',
-  length: 120,
-  width: 18,
-  draft: 4.5,
-  tonnage: 5000,
-  shipType: '散货船',
-  flag: '中国',
-  certificateNumber: 'CERT2024001234',
-  certificateExpire: '2027-12-31',
-  certificatePhoto: 'https://picsum.photos/id/3/600/400',
-  ownerName: '张建国',
-  ownerPhone: '13800138000',
-};
+const defaultCerts: ShipCertificate[] = [
+  {
+    id: 'cert1',
+    name: '船舶所有权证书',
+    number: 'CQZY2024-001234',
+    expireDate: '2028-12-31',
+    photo: 'https://picsum.photos/seed/cert1/600/400',
+  },
+  {
+    id: 'cert2',
+    name: '船舶检验证书',
+    number: 'CQJY2024-005678',
+    expireDate: '2026-06-30',
+    photo: 'https://picsum.photos/seed/cert2/600/400',
+  },
+  {
+    id: 'cert3',
+    name: '水路运输许可证',
+    number: 'SLYS2024-009012',
+    expireDate: '2027-03-15',
+    photo: 'https://picsum.photos/seed/cert3/600/400',
+  },
+];
 
 export const mockShipList: Ship[] = [
-  mockShip,
+  {
+    id: 'ship001',
+    name: '长江之星',
+    mmsi: '413987654',
+    callSign: 'BXYZ',
+    length: 120,
+    width: 18,
+    draft: 4.5,
+    tonnage: 5000,
+    shipType: '散货船',
+    flag: '中国',
+    photos: [
+      'https://picsum.photos/seed/ship1a/800/600',
+      'https://picsum.photos/seed/ship1b/800/600',
+      'https://picsum.photos/seed/ship1c/800/600',
+    ],
+    certificates: defaultCerts,
+    specialCargo: '',
+    ownerName: '张建国',
+    ownerPhone: '13800138000',
+    certificatePhoto: 'https://picsum.photos/seed/ship-cert-1/750/300',
+    certificateNumber: 'CQZY2024-001234',
+    certificateExpire: '2028-12-31',
+  },
   {
     id: 'ship002',
     name: '黄河号',
@@ -31,11 +60,21 @@ export const mockShipList: Ship[] = [
     tonnage: 3500,
     shipType: '集装箱船',
     flag: '中国',
-    certificateNumber: 'CERT2024001235',
-    certificateExpire: '2026-06-30',
-    certificatePhoto: 'https://picsum.photos/id/6/600/400',
+    photos: [
+      'https://picsum.photos/seed/ship2a/800/600',
+      'https://picsum.photos/seed/ship2b/800/600',
+    ],
+    certificates: defaultCerts.map((c) => ({
+      ...c,
+      id: c.id + '_2',
+      number: c.number.replace(/\d{6}$/, String(Number(c.number.slice(-6)) + 1)),
+    })),
+    specialCargo: '集装箱内可装载危险品，持有危化品运输许可证',
     ownerName: '李明',
     ownerPhone: '13900139000',
+    certificatePhoto: 'https://picsum.photos/seed/ship-cert-2/750/300',
+    certificateNumber: 'CQZY2024-002235',
+    certificateExpire: '2027-08-31',
   },
   {
     id: 'ship003',
@@ -48,10 +87,25 @@ export const mockShipList: Ship[] = [
     tonnage: 8000,
     shipType: '液货船',
     flag: '中国',
-    certificateNumber: 'CERT2024001236',
-    certificateExpire: '2028-03-15',
-    certificatePhoto: 'https://picsum.photos/id/8/600/400',
+    photos: [
+      'https://picsum.photos/seed/ship3a/800/600',
+      'https://picsum.photos/seed/ship3b/800/600',
+      'https://picsum.photos/seed/ship3c/800/600',
+      'https://picsum.photos/seed/ship3d/800/600',
+    ],
+    certificates: defaultCerts.map((c) => ({
+      ...c,
+      id: c.id + '_3',
+      number: c.number.replace(/\d{6}$/, String(Number(c.number.slice(-6)) + 2)),
+    })),
+    specialCargo:
+      '主营成品油、原油运输，配备惰性气体系统、液位监测报警系统，已通过船级社危险品运输认证',
     ownerName: '王海龙',
     ownerPhone: '13700137000',
+    certificatePhoto: 'https://picsum.photos/seed/ship-cert-3/750/300',
+    certificateNumber: 'CQZY2024-003236',
+    certificateExpire: '2026-11-15',
   },
 ];
+
+export const mockShip = mockShipList[0];

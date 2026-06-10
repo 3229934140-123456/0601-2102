@@ -1,75 +1,112 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, Input, Button, Image, Textarea } from '@tarojs/components';
 import Taro, { useDidShow, chooseImage } from '@tarojs/taro';
 import classnames from 'classnames';
 import dayjs from 'dayjs';
 import { useAppStore } from '@/store/appStore';
-import { mockShipList } from '@/data/ship';
 import { Ship } from '@/types';
-import ShipInfoCard from '@/components/ShipInfoCard';
 import styles from './index.module.scss';
 
 const ShipPage: React.FC = () => {
-  const { currentShip, setCurrentShip } = useAppStore();
-  const [shipList, setShipList] = useState<Ship[]>([]);
-  const [selectedShipId, setSelectedShipId] = useState<string>('');
+  const {
+    ships,
+    currentShipId,
+    setCurrentShipId,
+    updateShip,
+    getCurrentShip,
+  } = useAppStore();
+
+  const [selectedShipId, setSelectedShipId] = useState<string>(currentShipId);
   const [isEditing, setIsEditing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editData, setEditData] = useState<Partial<Ship>>({});
   const [specialCargo, setSpecialCargo] = useState('');
   const [certPhotos, setCertPhotos] = useState<string[]>([]);
+  const [seedLoaded, setSeedLoaded] = useState(false);
 
-  const loadData = useCallback(() => {
-    if (shipList.length === 0) {
-      setShipList(mockShipList);
-      if (!currentShip) {
-        setCurrentShip(mockShipList[0]);
+  const seedData = useCallback(() => {
+    if (seedLoaded) return;
+    const state = useAppStore.getState();
+    if (state.ships.length === 0) {
+      import('@/data/ship').then(({ mockShipList }) => {
+        useAppStore.setState({
+          ships: mockShipList,
+          currentShipId: mockShipList[0].id,
+        });
         setSelectedShipId(mockShipList[0].id);
-      } else {
-        setSelectedShipId(currentShip.id);
-      }
+      });
     }
-    if (currentShip) {
-      setCertPhotos(currentShip.certificatePhoto ? [currentShip.certificatePhoto] : []);
+    if (state.bookings.length === 0) {
+      import('@/data/booking').then(({ mockBookings }) => {
+        useAppStore.setState({ bookings: mockBookings });
+      });
     }
-  }, [shipList.length, currentShip, setCurrentShip]);
+    setSeedLoaded(true);
+  }, [seedLoaded]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    seedData();
+  }, [seedData]);
 
   useDidShow(() => {
-    loadData();
+    seedData();
   });
+
+  const selectedShip = useMemo(
+    () => ships.find((s) => s.id === selectedShipId) || getCurrentShip(),
+    [ships, selectedShipId, getCurrentShip]
+  );
 
   const onRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      loadData();
       setIsRefreshing(false);
       Taro.stopPullDownRefresh();
-    }, 1000);
+    }, 800);
   };
 
   useEffect(() => {
-    if (isRefreshing) {
-      onRefresh();
-    }
+    if (isRefreshing) onRefresh();
   }, [isRefreshing]);
 
-  const selectedShip = shipList.find((s) => s.id === selectedShipId) || currentShip;
+  useEffect(() => {
+    if (currentShipId && !selectedShipId) {
+      setSelectedShipId(currentShipId);
+    }
+  }, [currentShipId, selectedShipId]);
 
   const handleShipSelect = (ship: Ship) => {
-    setSelectedShipId(ship.id);
-    setCurrentShip(ship);
-    setIsEditing(false);
-    setCertPhotos(ship.certificatePhoto ? [ship.certificatePhoto] : []);
+    if (isEditing) {
+      Taro.showModal({
+        title: '提示',
+        content: '有未保存的编辑，确定要切换船舶吗？',
+        success: (res) => {
+          if (res.confirm) {
+            setSelectedShipId(ship.id);
+            setCurrentShipId(ship.id);
+            setIsEditing(false);
+            setCertPhotos(ship.certificatePhoto ? [ship.certificatePhoto] : ship.photos || []);
+            setSpecialCargo(ship.specialCargo || '');
+          }
+        },
+      });
+    } else {
+      setSelectedShipId(ship.id);
+      setCurrentShipId(ship.id);
+      setCertPhotos(ship.certificatePhoto ? [ship.certificatePhoto] : ship.photos || []);
+      setSpecialCargo(ship.specialCargo || '');
+    }
   };
 
   const handleStartEdit = () => {
     if (selectedShip) {
-      setEditData(selectedShip);
-      setSpecialCargo(selectedShip.shipType === '液货船' ? '易燃易爆液体，需特殊防护' : '');
+      setEditData({ ...selectedShip });
+      setSpecialCargo(selectedShip.specialCargo || '');
+      setCertPhotos(
+        selectedShip.certificatePhoto
+          ? [selectedShip.certificatePhoto]
+          : selectedShip.photos?.slice(0, 3) || []
+      );
       setIsEditing(true);
     }
   };
@@ -80,6 +117,7 @@ const ShipPage: React.FC = () => {
   };
 
   const handleSave = () => {
+    if (!selectedShip) return;
     if (!editData.name?.trim()) {
       Taro.showToast({ title: '请输入船名', icon: 'none' });
       return;
@@ -89,33 +127,36 @@ const ShipPage: React.FC = () => {
       return;
     }
 
-    const updatedShip: Ship = {
-      ...selectedShip!,
+    const updates: Partial<Ship> = {
       ...editData,
+      specialCargo,
       certificatePhoto: certPhotos[0],
-    } as Ship;
+      photos: certPhotos,
+      id: selectedShip.id,
+    };
 
-    const updatedList = shipList.map((s) =>
-      s.id === selectedShipId ? updatedShip : s
-    );
-    setShipList(updatedList);
-    setCurrentShip(updatedShip);
+    updateShip(selectedShip.id, updates);
+
     setIsEditing(false);
-
     Taro.showToast({ title: '保存成功', icon: 'success' });
   };
 
   const handleUploadPhoto = async () => {
     try {
       const res = await chooseImage({
-        count: 3 - certPhotos.length,
+        count: Math.max(1, 3 - certPhotos.length),
         sizeType: ['compressed'],
         sourceType: ['album', 'camera'],
       });
-      const newPhotos = [...certPhotos, ...res.tempFilePaths];
+      const newPhotos = [...certPhotos, ...res.tempFilePaths].slice(0, 3);
       setCertPhotos(newPhotos);
     } catch (error) {
       console.error('[Ship] 选择图片失败:', error);
+      // H5 环境下 chooseImage 不可用的回退
+      if (certPhotos.length < 3) {
+        const fallbackPhoto = `https://picsum.photos/seed/cert-fallback-${Date.now()}/750/500`;
+        setCertPhotos([...certPhotos, fallbackPhoto]);
+      }
     }
   };
 
@@ -133,6 +174,7 @@ const ShipPage: React.FC = () => {
   };
 
   const getCertExpireStatus = (expireDate: string) => {
+    if (!expireDate) return '';
     const days = dayjs(expireDate).diff(dayjs(), 'day');
     if (days < 0) return 'error';
     if (days < 30) return 'warning';
@@ -143,12 +185,24 @@ const ShipPage: React.FC = () => {
     setEditData({ ...editData, [field]: value });
   };
 
-  if (!selectedShip) {
+  if (ships.length === 0) {
     return (
       <View className={styles.page}>
         <View className={styles.emptyState}>
           <Text className={styles.emptyIcon}>🚢</Text>
           <Text className={styles.emptyText}>暂无船舶资料</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const displayShip = isEditing ? editData : selectedShip;
+  if (!displayShip) {
+    return (
+      <View className={styles.page}>
+        <View className={styles.emptyState}>
+          <Text className={styles.emptyIcon}>🚢</Text>
+          <Text className={styles.emptyText}>加载中...</Text>
         </View>
       </View>
     );
@@ -164,7 +218,7 @@ const ShipPage: React.FC = () => {
       >
         <View className={styles.content}>
           <ScrollView className={styles.shipSelector} scrollX>
-            {shipList.map((ship) => (
+            {ships.map((ship) => (
               <View
                 key={ship.id}
                 className={classnames(
@@ -182,7 +236,11 @@ const ShipPage: React.FC = () => {
             <View className={styles.photoSection}>
               <Image
                 className={styles.shipPhoto}
-                src={selectedShip.certificatePhoto || 'https://picsum.photos/id/3/750/300'}
+                src={
+                  certPhotos[0] ||
+                  displayShip.certificatePhoto ||
+                  'https://picsum.photos/id/3/750/300'
+                }
                 mode="aspectFill"
               />
               {isEditing && (
@@ -199,7 +257,7 @@ const ShipPage: React.FC = () => {
                       style={{ color: '#fff', fontSize: '40rpx', fontWeight: 'bold' }}
                     />
                   ) : (
-                    selectedShip.name
+                    displayShip.name
                   )}
                 </Text>
                 <View className={styles.shipTypeBadge}>
@@ -211,7 +269,7 @@ const ShipPage: React.FC = () => {
                         style={{ color: '#1E88E5', fontSize: '24rpx' }}
                       />
                     ) : (
-                      selectedShip.shipType
+                      displayShip.shipType
                     )}
                   </Text>
                 </View>
@@ -238,7 +296,7 @@ const ShipPage: React.FC = () => {
                       onInput={(e) => handleInputChange('mmsi', e.detail.value)}
                     />
                   ) : (
-                    <Text className={styles.paramValue}>{selectedShip.mmsi}</Text>
+                    <Text className={styles.paramValue}>{displayShip.mmsi}</Text>
                   )}
                 </View>
                 <View className={styles.paramItem}>
@@ -250,7 +308,7 @@ const ShipPage: React.FC = () => {
                       onInput={(e) => handleInputChange('callSign', e.detail.value)}
                     />
                   ) : (
-                    <Text className={styles.paramValue}>{selectedShip.callSign}</Text>
+                    <Text className={styles.paramValue}>{displayShip.callSign}</Text>
                   )}
                 </View>
                 <View className={styles.paramItem}>
@@ -264,7 +322,7 @@ const ShipPage: React.FC = () => {
                     />
                   ) : (
                     <Text className={styles.paramValue}>
-                      {selectedShip.length}
+                      {displayShip.length}
                       <Text className={styles.unit}>m</Text>
                     </Text>
                   )}
@@ -280,7 +338,7 @@ const ShipPage: React.FC = () => {
                     />
                   ) : (
                     <Text className={styles.paramValue}>
-                      {selectedShip.width}
+                      {displayShip.width}
                       <Text className={styles.unit}>m</Text>
                     </Text>
                   )}
@@ -296,7 +354,7 @@ const ShipPage: React.FC = () => {
                     />
                   ) : (
                     <Text className={styles.paramValue}>
-                      {selectedShip.draft}
+                      {displayShip.draft}
                       <Text className={styles.unit}>m</Text>
                     </Text>
                   )}
@@ -312,7 +370,7 @@ const ShipPage: React.FC = () => {
                     />
                   ) : (
                     <Text className={styles.paramValue}>
-                      {selectedShip.tonnage}
+                      {displayShip.tonnage}
                       <Text className={styles.unit}>t</Text>
                     </Text>
                   )}
@@ -329,11 +387,15 @@ const ShipPage: React.FC = () => {
                     <Input
                       className={styles.paramInput}
                       value={editData.certificateNumber}
-                      onInput={(e) => handleInputChange('certificateNumber', e.detail.value)}
+                      onInput={(e) =>
+                        handleInputChange('certificateNumber', e.detail.value)
+                      }
                       style={{ width: '300rpx', textAlign: 'right' }}
                     />
                   ) : (
-                    <Text className={styles.certValue}>{selectedShip.certificateNumber}</Text>
+                    <Text className={styles.certValue}>
+                      {displayShip.certificateNumber || '--'}
+                    </Text>
                   )}
                 </View>
                 <View className={styles.certRow}>
@@ -342,7 +404,9 @@ const ShipPage: React.FC = () => {
                     <Input
                       className={styles.paramInput}
                       value={editData.certificateExpire}
-                      onInput={(e) => handleInputChange('certificateExpire', e.detail.value)}
+                      onInput={(e) =>
+                        handleInputChange('certificateExpire', e.detail.value)
+                      }
                       style={{ width: '200rpx', textAlign: 'right' }}
                     />
                   ) : (
@@ -350,10 +414,10 @@ const ShipPage: React.FC = () => {
                       className={classnames(
                         styles.certValue,
                         styles.certExpire,
-                        styles[getCertExpireStatus(selectedShip.certificateExpire)]
+                        styles[getCertExpireStatus(displayShip.certificateExpire || '')]
                       )}
                     >
-                      {selectedShip.certificateExpire}
+                      {displayShip.certificateExpire || '--'}
                     </Text>
                   )}
                 </View>
@@ -373,7 +437,7 @@ const ShipPage: React.FC = () => {
                       style={{ width: '300rpx', textAlign: 'right' }}
                     />
                   ) : (
-                    <Text className={styles.ownerValue}>{selectedShip.ownerName}</Text>
+                    <Text className={styles.ownerValue}>{displayShip.ownerName}</Text>
                   )}
                 </View>
                 <View className={styles.ownerRow}>
@@ -388,56 +452,77 @@ const ShipPage: React.FC = () => {
                     />
                   ) : (
                     <Text className={classnames(styles.ownerValue, styles.ownerPhone)}>
-                      {selectedShip.ownerPhone}
+                      {displayShip.ownerPhone}
                     </Text>
                   )}
                 </View>
               </View>
 
-              {isEditing && (
-                <>
-                  <View className={styles.photoPreviewSection}>
-                    <Text className={styles.specialLabel}>证件照片</Text>
-                    <View className={styles.photoList}>
-                      {certPhotos.map((photo, index) => (
-                        <View key={index} className={styles.photoItem}>
-                          <Image
-                            className={styles.photoImg}
-                            src={photo}
-                            mode="aspectFill"
-                          />
-                          <View
-                            className={styles.photoDelete}
-                            onClick={() => handleDeletePhoto(index)}
-                          >
-                            <Text className={styles.photoDeleteText}>×</Text>
-                          </View>
-                        </View>
-                      ))}
-                      {certPhotos.length < 3 && (
-                        <View className={styles.photoAdd} onClick={handleUploadPhoto}>
-                          <Text className={styles.photoAddIcon}>+</Text>
-                          <Text className={styles.photoAddText}>上传</Text>
+              <View className={styles.sectionTitle}>
+                <Text>特殊货物说明</Text>
+              </View>
+              {isEditing ? (
+                <View className={styles.specialSection}>
+                  <Text className={styles.specialHint}>
+                    如有常运的危险品、特殊尺寸货物等，请在此说明，便于审核
+                  </Text>
+                  <Textarea
+                    className={styles.specialTextarea}
+                    value={specialCargo}
+                    onInput={(e) => setSpecialCargo(e.detail.value)}
+                    placeholder="请输入特殊货物说明（如：危险品、冷藏货物、超长超宽货物等）"
+                    maxlength={500}
+                  />
+                </View>
+              ) : (
+                <View className={styles.specialDisplay}>
+                  {displayShip.specialCargo ? (
+                    <Text className={styles.specialDisplayText}>
+                      {displayShip.specialCargo}
+                    </Text>
+                  ) : (
+                    <Text className={styles.specialEmpty}>
+                      无特殊货物说明（点击右上角"编辑"补充）
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              <View className={styles.sectionTitle}>
+                <Text>证件照片</Text>
+              </View>
+              <View className={styles.photoPreviewSection}>
+                <View className={styles.photoList}>
+                  {certPhotos.map((photo, index) => (
+                    <View key={index} className={styles.photoItem}>
+                      <Image
+                        className={styles.photoImg}
+                        src={photo}
+                        mode="aspectFill"
+                      />
+                      {isEditing && (
+                        <View
+                          className={styles.photoDelete}
+                          onClick={() => handleDeletePhoto(index)}
+                        >
+                          <Text className={styles.photoDeleteText}>×</Text>
                         </View>
                       )}
                     </View>
-                  </View>
-
-                  <View className={styles.specialSection}>
-                    <Text className={styles.specialLabel}>特殊货物说明</Text>
-                    <Text className={styles.specialHint}>
-                      如有常运的危险品、特殊尺寸货物等，请在此说明，便于审核
+                  ))}
+                  {isEditing && certPhotos.length < 3 && (
+                    <View className={styles.photoAdd} onClick={handleUploadPhoto}>
+                      <Text className={styles.photoAddIcon}>+</Text>
+                      <Text className={styles.photoAddText}>上传</Text>
+                    </View>
+                  )}
+                  {!isEditing && certPhotos.length === 0 && (
+                    <Text className={styles.specialEmpty}>
+                      暂无证件照片（点击"编辑"上传）
                     </Text>
-                    <Textarea
-                      className={styles.specialTextarea}
-                      value={specialCargo}
-                      onInput={(e) => setSpecialCargo(e.detail.value)}
-                      placeholder="请输入特殊货物说明（如：危险品、冷藏货物、超长超宽货物等）"
-                      maxlength={500}
-                    />
-                  </View>
-                </>
-              )}
+                  )}
+                </View>
+              </View>
             </View>
           </View>
         </View>

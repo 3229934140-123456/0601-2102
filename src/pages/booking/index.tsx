@@ -1,23 +1,36 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Button, ScrollView, Input, Picker, Textarea } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import classnames from 'classnames';
 import dayjs from 'dayjs';
 import { useAppStore } from '@/store/appStore';
-import { Booking, BookingStatus, CargoType, TimeSlot } from '@/types';
+import { Booking, CargoType, TimeSlot } from '@/types';
 import BookingCard from '@/components/BookingCard';
 import { mockBookings } from '@/data/booking';
 import { getLocks, getTimeSlots, generateId, cargoTypeMap } from '@/utils';
 import styles from './index.module.scss';
 
 const BookingPage: React.FC = () => {
-  const { userRole, setUserRole, bookings, addBooking, updateBooking, cancelBooking } = useAppStore();
+  const {
+    role,
+    setRole,
+    bookings,
+    addBooking,
+    updateBooking,
+    cancelBooking,
+    ships,
+    currentShipId,
+    setCurrentShipId,
+  } = useAppStore();
+
   const [activeTab, setActiveTab] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [seedLoaded, setSeedLoaded] = useState(false);
 
   const [formData, setFormData] = useState({
+    shipId: '',
     shipName: '',
     lockId: '',
     lockName: '',
@@ -32,14 +45,15 @@ const BookingPage: React.FC = () => {
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
 
-  const locks = getLocks();
+  const locks = useMemo(() => getLocks(), []);
 
   const tabs = [
     { key: 'all', label: '全部' },
     { key: 'pending', label: '待审核' },
     { key: 'approved', label: '已通过' },
     { key: 'queuing', label: '排队中' },
-    { key: 'passed', label: '已完成' },
+    { key: 'passed', label: '已过闸' },
+    { key: 'rejected', label: '已退回' },
   ];
 
   const cargoTypes: { key: CargoType; label: string }[] = [
@@ -50,45 +64,68 @@ const BookingPage: React.FC = () => {
     { key: 'liquid', label: '液体货物' },
   ];
 
-  const displayBookings = activeTab === 'all'
-    ? bookings
-    : bookings.filter((b) => b.status === activeTab);
-
-  const loadData = useCallback(() => {
-    if (bookings.length === 0) {
-      useAppStore.setState({ bookings: mockBookings });
+  const seedData = useCallback(() => {
+    if (seedLoaded) return;
+    const state = useAppStore.getState();
+    const patch: Record<string, unknown> = {};
+    if (state.bookings.length === 0) patch.bookings = mockBookings;
+    // 不覆盖用户已持久化的船只
+    if (state.ships.length === 0) {
+      import('@/data/ship').then(({ mockShipList }) => {
+        useAppStore.setState({
+          ships: mockShipList,
+          currentShipId: mockShipList[0].id,
+        });
+      });
     }
-    const slots = getTimeSlots(formData.bookingDate);
-    setAvailableSlots(slots);
-  }, [bookings.length, formData.bookingDate]);
+    if (Object.keys(patch).length > 0) {
+      useAppStore.setState(patch);
+    }
+    setTimeout(() => state.refreshQueueFromBookings(), 0);
+    setSeedLoaded(true);
+  }, [seedLoaded]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    seedData();
+  }, [seedData]);
 
   useDidShow(() => {
-    loadData();
+    seedData();
+    // 每次显示都重建排队
+    setTimeout(() => useAppStore.getState().refreshQueueFromBookings(), 0);
   });
+
+  const displayBookings = useMemo(() => {
+    return activeTab === 'all' ? bookings : bookings.filter((b) => b.status === activeTab);
+  }, [activeTab, bookings]);
+
+  const loadSlots = useCallback((date: string) => {
+    const slots = getTimeSlots(date);
+    setAvailableSlots(slots);
+  }, []);
 
   const onRefresh = () => {
     setIsRefreshing(true);
+    loadSlots(formData.bookingDate);
     setTimeout(() => {
-      loadData();
+      useAppStore.getState().refreshQueueFromBookings();
       setIsRefreshing(false);
       Taro.stopPullDownRefresh();
-    }, 1000);
+      Taro.showToast({ title: '已刷新', icon: 'success' });
+    }, 800);
   };
 
   useEffect(() => {
-    if (isRefreshing) {
-      onRefresh();
-    }
+    if (isRefreshing) onRefresh();
   }, [isRefreshing]);
+
+  const defaultShip = ships.find((s) => s.id === currentShipId) || ships[0];
 
   const handleOpenModal = (booking?: Booking) => {
     if (booking) {
       setEditingBooking(booking);
       setFormData({
+        shipId: booking.shipId,
         shipName: booking.shipName,
         lockId: booking.lockId,
         lockName: booking.lockName,
@@ -108,10 +145,12 @@ const BookingPage: React.FC = () => {
         available: 1,
         total: 5,
       });
+      loadSlots(booking.bookingDate);
     } else {
       setEditingBooking(null);
       setFormData({
-        shipName: '长江之星',
+        shipId: defaultShip?.id || 'ship001',
+        shipName: defaultShip?.name || '长江之星',
         lockId: '',
         lockName: '',
         bookingDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
@@ -119,12 +158,11 @@ const BookingPage: React.FC = () => {
         cargoType: 'general',
         cargoDescription: '',
         cargoWeight: '',
-        specialCargo: '',
+        specialCargo: defaultShip?.specialCargo || '',
       });
       setSelectedSlot(null);
+      loadSlots(dayjs().add(1, 'day').format('YYYY-MM-DD'));
     }
-    const slots = getTimeSlots(formData.bookingDate);
-    setAvailableSlots(slots);
     setShowModal(true);
   };
 
@@ -135,15 +173,27 @@ const BookingPage: React.FC = () => {
 
   const handleLockChange = (e: { detail: { value: number } }) => {
     const lock = locks[e.detail.value];
+    if (!lock) return;
     setFormData({ ...formData, lockId: lock.id, lockName: lock.name });
+  };
+
+  const handleShipChange = (e: { detail: { value: number } }) => {
+    const ship = ships[e.detail.value];
+    if (!ship) return;
+    setFormData({
+      ...formData,
+      shipId: ship.id,
+      shipName: ship.name,
+      specialCargo: ship.specialCargo || formData.specialCargo,
+    });
+    setCurrentShipId(ship.id);
   };
 
   const handleDateChange = (e: { detail: { value: string } }) => {
     const newDate = e.detail.value;
     setFormData({ ...formData, bookingDate: newDate, timeSlot: '' });
     setSelectedSlot(null);
-    const slots = getTimeSlots(newDate);
-    setAvailableSlots(slots);
+    loadSlots(newDate);
   };
 
   const handleSlotSelect = (slot: TimeSlot) => {
@@ -183,9 +233,8 @@ const BookingPage: React.FC = () => {
   const handleSubmit = () => {
     if (!validateForm()) return;
 
-    const newBooking: Booking = {
-      id: editingBooking?.id || `bk${Date.now()}`,
-      shipId: 'ship001',
+    const baseBooking = {
+      shipId: formData.shipId || 'ship001',
       shipName: formData.shipName,
       lockId: formData.lockId,
       lockName: formData.lockName,
@@ -196,15 +245,20 @@ const BookingPage: React.FC = () => {
       cargoDescription: formData.cargoDescription,
       cargoWeight: Number(formData.cargoWeight),
       specialCargo: formData.specialCargo || undefined,
-      status: 'pending',
-      applyTime: dayjs().format('YYYY-MM-DD HH:mm'),
     };
 
     if (editingBooking) {
-      updateBooking(editingBooking.id, newBooking);
+      updateBooking(editingBooking.id, {
+        ...baseBooking,
+      });
       Taro.showToast({ title: '修改成功', icon: 'success' });
     } else {
-      addBooking(newBooking);
+      addBooking({
+        ...baseBooking,
+        id: generateId('bk'),
+        status: 'pending',
+        applyTime: dayjs().format('YYYY-MM-DD HH:mm'),
+      });
       Taro.showToast({ title: '提交成功', icon: 'success' });
     }
 
@@ -212,17 +266,29 @@ const BookingPage: React.FC = () => {
   };
 
   const handleCancelBooking = (id: string) => {
-    cancelBooking(id);
-    Taro.showToast({ title: '已取消', icon: 'success' });
+    Taro.showModal({
+      title: '取消预约',
+      content: '确定要取消该预约吗？此操作不可撤销。',
+      success: (res) => {
+        if (res.confirm) {
+          cancelBooking(id);
+          Taro.showToast({ title: '已取消', icon: 'success' });
+        }
+      },
+    });
   };
 
   const handleEditBooking = (booking: Booking) => {
+    if (booking.status !== 'pending') {
+      Taro.showToast({ title: '仅待审核预约可修改', icon: 'none' });
+      return;
+    }
     handleOpenModal(booking);
   };
 
   const toggleRole = () => {
-    const newRole = userRole === 'shipOwner' ? 'operator' : 'shipOwner';
-    setUserRole(newRole);
+    const newRole = role === 'shipOwner' ? 'operator' : 'shipOwner';
+    setRole(newRole);
     Taro.showToast({
       title: `已切换为${newRole === 'shipOwner' ? '船主' : '值班员'}`,
       icon: 'none',
@@ -239,7 +305,7 @@ const BookingPage: React.FC = () => {
       <View className={styles.header}>
         <Text className={styles.title}>预约申请</Text>
         <Button className={styles.roleToggle} onClick={toggleRole}>
-          {userRole === 'shipOwner' ? '船主' : '值班员'}
+          {role === 'shipOwner' ? '船主' : '值班员'}
         </Button>
       </View>
 
@@ -266,7 +332,11 @@ const BookingPage: React.FC = () => {
         >
           {displayBookings.length === 0 ? (
             <View className={styles.emptyState}>
+              <Text style={{ fontSize: 80, marginBottom: 16 }}>📝</Text>
               <Text className={styles.emptyText}>暂无预约记录</Text>
+              <Text style={{ fontSize: 22, color: '#86909c', marginTop: 8 }}>
+                点击右下角 + 发起新预约
+              </Text>
             </View>
           ) : (
             displayBookings.map((booking) => (
@@ -298,6 +368,25 @@ const BookingPage: React.FC = () => {
             </View>
 
             <ScrollView className={styles.modalBody} scrollY>
+              <View className={styles.formGroup}>
+                <Text className={styles.formLabel}>
+                  <Text className={styles.required}>*</Text>选择船舶
+                </Text>
+                <Picker
+                  mode="selector"
+                  range={ships.map((s) => `${s.name} (${s.mmsi.slice(-4)})`)}
+                  value={ships.findIndex((s) => s.id === formData.shipId)}
+                  onChange={handleShipChange}
+                >
+                  <View className={styles.formPicker}>
+                    <Text className={styles.pickerText}>
+                      {formData.shipName || '请选择船舶'}
+                    </Text>
+                    <Text className={styles.pickerArrow}>›</Text>
+                  </View>
+                </Picker>
+              </View>
+
               <View className={styles.formGroup}>
                 <Text className={styles.formLabel}>
                   <Text className={styles.required}>*</Text>船名
@@ -405,8 +494,10 @@ const BookingPage: React.FC = () => {
                 <Input
                   className={styles.formInput}
                   value={formData.cargoDescription}
-                  onInput={(e) => setFormData({ ...formData, cargoDescription: e.detail.value })}
-                  placeholder="请输入货物名称"
+                  onInput={(e) =>
+                    setFormData({ ...formData, cargoDescription: e.detail.value })
+                  }
+                  placeholder="例如：煤炭、钢材、粮食、集装箱等"
                 />
               </View>
 
@@ -419,7 +510,7 @@ const BookingPage: React.FC = () => {
                   type="digit"
                   value={formData.cargoWeight}
                   onInput={(e) => setFormData({ ...formData, cargoWeight: e.detail.value })}
-                  placeholder="请输入载货量"
+                  placeholder="请输入载货吨数"
                 />
               </View>
 
@@ -429,7 +520,7 @@ const BookingPage: React.FC = () => {
                   className={styles.textarea}
                   value={formData.specialCargo}
                   onInput={(e) => setFormData({ ...formData, specialCargo: e.detail.value })}
-                  placeholder="如有危险品、特殊尺寸货物等请在此说明"
+                  placeholder="如有危险品、特殊尺寸货物、需要特殊防护措施等请在此说明"
                   maxlength={500}
                 />
               </View>

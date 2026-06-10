@@ -26,16 +26,19 @@ export const messageTypeMap: Record<MessageType, string> = {
   review: '审核通知',
 };
 
-export const formatTime = (date: string, format: string = 'YYYY-MM-DD HH:mm'): string => {
+export const formatTime = (date: string | number, format: string = 'YYYY-MM-DD HH:mm'): string => {
+  if (date === null || date === undefined) return '';
   return dayjs(date).format(format);
 };
 
 export const formatDate = (date: string): string => {
+  if (date === null || date === undefined) return '';
   return dayjs(date).format('YYYY-MM-DD');
 };
 
-export const generateId = (): string => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+export const generateId = (prefix?: string): string => {
+  const rand = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  return prefix ? `${prefix}_${rand}` : rand;
 };
 
 export const getTimeSlots = (date: string) => {

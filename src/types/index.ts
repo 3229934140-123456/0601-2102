@@ -1,10 +1,25 @@
-export type BookingStatus = 'pending' | 'approved' | 'rejected' | 'queuing' | 'released' | 'cancelled' | 'passed';
+export type BookingStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'queuing'
+  | 'released'
+  | 'cancelled'
+  | 'passed';
 
 export type CargoType = 'general' | 'dangerous' | 'bulk' | 'container' | 'liquid';
 
 export type MessageType = 'system' | 'booking' | 'queue' | 'review';
 
 export type UserRole = 'shipOwner' | 'operator';
+
+export interface ShipCertificate {
+  id: string;
+  name: string;
+  number: string;
+  expireDate: string;
+  photo?: string;
+}
 
 export interface Ship {
   id: string;
@@ -17,11 +32,14 @@ export interface Ship {
   tonnage: number;
   shipType: string;
   flag: string;
-  certificateNumber: string;
-  certificateExpire: string;
-  certificatePhoto?: string;
+  photos: string[];
+  certificates: ShipCertificate[];
+  specialCargo: string;
   ownerName: string;
   ownerPhone: string;
+  certificatePhoto?: string;
+  certificateNumber?: string;
+  certificateExpire?: string;
 }
 
 export interface Booking {
@@ -42,6 +60,7 @@ export interface Booking {
   applyTime: string;
   reviewTime?: string;
   reviewRemark?: string;
+  reviewer?: string;
   actualPassTime?: string;
   operatorId?: string;
 }
@@ -64,7 +83,7 @@ export interface Message {
   title: string;
   content: string;
   bookingId?: string;
-  createTime: string;
+  createTime: number;
   isRead: boolean;
 }
 
@@ -90,17 +109,23 @@ export interface TimeSlot {
 
 export interface DailyStats {
   date: string;
-  totalBookings: number;
+  total: number;
   approved: number;
+  pending: number;
   rejected: number;
+  queuing: number;
   passed: number;
-  noShow: number;
+  cancelled: number;
 }
 
 export interface NoShowItem {
   id: string;
+  bookingId: string;
+  shipId: string;
   shipName: string;
   bookingDate: string;
   lockName: string;
+  timeSlot: string;
   reason: string;
+  createTime: number;
 }

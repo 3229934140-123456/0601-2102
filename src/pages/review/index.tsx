@@ -1,138 +1,188 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Button, ScrollView, Input, Textarea } from '@tarojs/components';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, Button, ScrollView, Textarea } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import classnames from 'classnames';
 import dayjs from 'dayjs';
 import { useAppStore } from '@/store/appStore';
-import { mockReviewItems, mockDailyStats, mockNoShowList } from '@/data/review';
-import { ReviewItem, BookingStatus, DailyStats, NoShowItem } from '@/types';
-import ReviewCard from '@/components/ReviewCard';
-import { statusMap, cargoTypeMap, formatTime } from '@/utils';
+import { mockNoShowList } from '@/data/review';
+import { mockBookings } from '@/data/booking';
+import { DailyStats, NoShowItem, Booking } from '@/types';
+import { formatTime } from '@/utils';
 import styles from './index.module.scss';
 
+type TabKey = 'pending' | 'approved' | 'rejected' | 'queuing' | 'passed' | 'stats';
+
 const ReviewPage: React.FC = () => {
-  const { reviewList, updateBookingStatus, role, setRole } = useAppStore();
-  const [activeTab, setActiveTab] = useState<string>('pending');
+  const {
+    role,
+    setRole,
+    bookings,
+    approveBooking,
+    rejectBooking,
+    recordPassTime,
+    noShowItems,
+    addNoShow,
+  } = useAppStore();
+
+  const [activeTab, setActiveTab] = useState<TabKey>('pending');
   const [selectedDate, setSelectedDate] = useState<string>(dayjs().format('YYYY-MM-DD'));
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<ReviewItem | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
-  const [noShowList, setNoShowList] = useState<NoShowItem[]>([]);
+  const [seedLoaded, setSeedLoaded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const tabs = [
-    { key: 'pending', label: '待审核', status: 'pending' },
-    { key: 'approved', label: '已通过', status: 'approved' },
-    { key: 'rejected', label: '已拒绝', status: 'rejected' },
-    { key: 'stats', label: '统计', status: '' },
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: 'pending', label: '待审核' },
+    { key: 'approved', label: '排队中' },
+    { key: 'passed', label: '已过闸' },
+    { key: 'rejected', label: '已退回' },
+    { key: 'stats', label: '统计' },
   ];
 
-  const loadData = useCallback(() => {
-    if (reviewList.length === 0) {
-      useAppStore.setState({ reviewList: mockReviewItems });
-    }
-    setDailyStats(mockDailyStats[0]);
-    setNoShowList(mockNoShowList);
-  }, [reviewList.length]);
+  const seedData = useCallback(() => {
+    if (seedLoaded) return;
+    const state = useAppStore.getState();
+    const patch: Record<string, unknown> = {};
+    if (state.bookings.length === 0) patch.bookings = mockBookings;
+    if (state.noShowItems.length === 0) patch.noShowItems = mockNoShowList;
+    if (Object.keys(patch).length > 0) useAppStore.setState(patch);
+    setTimeout(() => state.refreshQueueFromBookings(), 0);
+    setSeedLoaded(true);
+  }, [seedLoaded]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    seedData();
+  }, [seedData]);
 
   useDidShow(() => {
-    loadData();
+    seedData();
+    setTimeout(() => useAppStore.getState().refreshQueueFromBookings(), 0);
   });
+
+  // 按选中日期过滤 bookings（统计和列表都基于此）
+  const dateBookings = useMemo(
+    () => bookings.filter((b) => b.bookingDate === selectedDate),
+    [bookings, selectedDate]
+  );
+
+  // 今日统计（动态计算，完全对得上列表）
+  const dailyStats: DailyStats = useMemo(() => {
+    const base = { date: selectedDate, total: 0, approved: 0, pending: 0, rejected: 0, queuing: 0, passed: 0, cancelled: 0 };
+    return dateBookings.reduce((acc, b) => {
+      acc.total += 1;
+      if (b.status in acc) (acc as any)[b.status] += 1;
+      return acc;
+    }, base);
+  }, [dateBookings, selectedDate]);
+
+  // 按日期过滤的爽约名单
+  const dateNoShowItems = useMemo(() => {
+    return noShowItems.filter((n) => n.bookingDate === selectedDate);
+  }, [noShowItems, selectedDate]);
+
+  // 近 7 天趋势（每日 total bookings）
+  const trendData = useMemo(() => {
+    return Array.from({ length: 7 }).map((_, i) => {
+      const date = dayjs().subtract(6 - i, 'day').format('YYYY-MM-DD');
+      const count = bookings.filter((b) => b.bookingDate === date).length;
+      return { date: dayjs(date).format('MM-DD'), value: count, rawDate: date };
+    });
+  }, [bookings]);
+
+  const maxValue = Math.max(...trendData.map((d) => d.value), 1);
 
   const onRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      loadData();
+      useAppStore.getState().refreshQueueFromBookings();
       setIsRefreshing(false);
       Taro.stopPullDownRefresh();
       Taro.showToast({ title: '已刷新', icon: 'success' });
-    }, 1000);
+    }, 800);
   };
 
   useEffect(() => {
-    if (isRefreshing) {
-      onRefresh();
-    }
+    if (isRefreshing) onRefresh();
   }, [isRefreshing]);
 
-  const getFilteredList = (status: string) => {
-    return reviewList.filter((item) => {
-      if (status === 'pending') return item.status === 'pending';
-      if (status === 'approved') return item.status === 'approved';
-      if (status === 'rejected') return item.status === 'rejected';
-      return false;
+  const getFilteredBookings = (tab: TabKey): Booking[] => {
+    if (tab === 'stats') return [];
+    if (tab === 'approved') {
+      return dateBookings.filter(
+        (b) => b.status === 'approved' || b.status === 'queuing'
+      );
+    }
+    return dateBookings.filter((b) => b.status === tab);
+  };
+
+  const getCount = (tab: TabKey) => {
+    if (tab === 'stats') return '';
+    return getFilteredBookings(tab).length;
+  };
+
+  const handleApprove = (id: string) => {
+    setSelectedBookingId(id);
+    Taro.showModal({
+      title: '审核通过',
+      content: `确认通过该船舶的过闸申请？\n通过后将自动排入等待队列。`,
+      success: (res) => {
+        if (res.confirm) {
+          approveBooking(id, '值班员-张工');
+          Taro.showToast({ title: '已通过', icon: 'success' });
+          setSelectedBookingId(null);
+        }
+      },
     });
   };
 
-  const getCountByStatus = (status: string) => {
-    if (status === 'pending') return reviewList.filter((item) => item.status === 'pending').length;
-    if (status === 'approved') return reviewList.filter((item) => item.status === 'approved').length;
-    if (status === 'rejected') return reviewList.filter((item) => item.status === 'rejected').length;
-    return 0;
-  };
-
-  const handleApprove = (item: ReviewItem) => {
-    setSelectedBooking(item);
-    setShowApproveModal(true);
-  };
-
-  const handleConfirmApprove = () => {
-    if (!selectedBooking) return;
-    updateBookingStatus(selectedBooking.id, 'approved', '值班员-张工');
-    Taro.showToast({ title: '审核通过', icon: 'success' });
-    setShowApproveModal(false);
-    setSelectedBooking(null);
-  };
-
-  const handleReject = (item: ReviewItem) => {
-    setSelectedBooking(item);
+  const handleOpenReject = (id: string) => {
+    setSelectedBookingId(id);
     setRejectReason('');
     setShowRejectModal(true);
   };
 
   const handleConfirmReject = () => {
-    if (!selectedBooking) return;
     if (!rejectReason.trim()) {
       Taro.showToast({ title: '请填写退回原因', icon: 'none' });
       return;
     }
-    updateBookingStatus(selectedBooking.id, 'rejected', '值班员-张工', rejectReason);
-    Taro.showToast({ title: '已退回', icon: 'success' });
+    if (selectedBookingId) {
+      rejectBooking(selectedBookingId, '值班员-张工', rejectReason);
+      Taro.showToast({ title: '已退回', icon: 'success' });
+    }
     setShowRejectModal(false);
-    setSelectedBooking(null);
+    setSelectedBookingId(null);
     setRejectReason('');
   };
 
-  const handleRecordPassing = (item: ReviewItem) => {
+  const handleRecordPassing = (id: string) => {
+    const b = bookings.find((x) => x.id === id);
+    if (!b) return;
     Taro.showModal({
-      title: '记录过闸',
-      content: `确定记录 ${item.shipName} 实际过闸时间为\n${formatTime(Date.now(), 'YYYY-MM-DD HH:mm')}？`,
+      title: '记录实际过闸',
+      content: `确认记录「${b.shipName}」于\n${dayjs().format('YYYY-MM-DD HH:mm')} 通过 ${b.lockName}？`,
       success: (res) => {
         if (res.confirm) {
-          updateBookingStatus(item.id, 'passed', '值班员-张工', undefined, Date.now());
-          Taro.showToast({ title: '已记录过闸', icon: 'success' });
+          recordPassTime(id, '值班员-张工', Date.now());
+          Taro.showToast({ title: '已记录', icon: 'success' });
         }
       },
     });
   };
 
   const handleDateChange = () => {
+    const options: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const d = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
+      options.push(i === 0 ? `今天 (${d})` : i === 1 ? `昨天 (${d})` : d);
+    }
     Taro.showActionSheet({
-      itemList: ['今天', '昨天', '前天', '自定义'],
+      itemList: options,
       success: (res) => {
-        const days = [0, 1, 2];
-        if (res.tapIndex < 3) {
-          const newDate = dayjs().subtract(days[res.tapIndex], 'day').format('YYYY-MM-DD');
-          setSelectedDate(newDate);
-        } else {
-          Taro.showToast({ title: '请在H5端选择日期', icon: 'none' });
-        }
+        const newDate = dayjs().subtract(res.tapIndex, 'day').format('YYYY-MM-DD');
+        setSelectedDate(newDate);
+        Taro.showToast({ title: `已切换到 ${newDate}`, icon: 'none' });
       },
     });
   };
@@ -141,99 +191,23 @@ const ReviewPage: React.FC = () => {
     Taro.showActionSheet({
       itemList: ['切换为船主', '切换为值班员'],
       success: (res) => {
-        const newRole = res.tapIndex === 0 ? 'owner' : 'operator';
+        const newRole = res.tapIndex === 0 ? 'shipOwner' : 'operator';
         setRole(newRole);
         Taro.showToast({
-          title: `已切换为${newRole === 'owner' ? '船主' : '值班员'}`,
+          title: `已切换为${newRole === 'shipOwner' ? '船主' : '值班员'}`,
           icon: 'success',
         });
       },
     });
   };
 
-  const trendData = [
-    { date: '12-15', value: 12 },
-    { date: '12-16', value: 18 },
-    { date: '12-17', value: 15 },
-    { date: '12-18', value: 22 },
-    { date: '12-19', value: 20 },
-    { date: '12-20', value: 25 },
-    { date: '12-21', value: dailyStats?.total || 0 },
-  ];
-
-  const maxValue = Math.max(...trendData.map((d) => d.value), 1);
-
-  const renderList = (status: string) => {
-    const list = getFilteredList(status);
-    if (list.length === 0) {
-      return (
-        <View className={styles.emptyState}>
-          <Text className={styles.emptyIcon}>📋</Text>
-          <Text className={styles.emptyText}>暂无数据</Text>
-        </View>
-      );
-    }
-    return list.map((item) => (
-      <ReviewCard
-        key={item.id}
-        item={item}
-        onApprove={() => handleApprove(item)}
-        onReject={() => handleReject(item)}
-        onRecordPassing={() => handleRecordPassing(item)}
-      />
-    ));
-  };
-
-  const renderStats = () => {
-    if (!dailyStats) return null;
-    return (
-      <View className={styles.statsSection}>
-        <View className={styles.chartCard}>
-          <Text className={styles.chartTitle}>近7日预约趋势</Text>
-          <View className={styles.trendChart}>
-            <View className={styles.yAxis}>
-              <Text className={styles.yTick}>{maxValue}</Text>
-              <Text className={styles.yTick}>{Math.floor(maxValue / 2)}</Text>
-              <Text className={styles.yTick}>0</Text>
-            </View>
-            {trendData.map((item, index) => (
-              <View key={index} className={styles.chartBar}>
-                <View className={styles.barFill} style={{ height: `${(item.value / maxValue) * 100}%` }}>
-                  <Text className={styles.barValue}>{item.value}</Text>
-                </View>
-                <Text className={styles.barLabel}>{item.date}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View className={styles.noShowSection}>
-          <Text className={styles.sectionTitle}>爽约名单</Text>
-          {noShowList.length === 0 ? (
-            <View className={styles.emptyState}>
-              <Text className={styles.emptyIcon}>✅</Text>
-              <Text className={styles.emptyText}>暂无爽约记录</Text>
-            </View>
-          ) : (
-            noShowList.map((item) => (
-              <View key={item.id} className={styles.noShowCard}>
-                <View className={styles.noShowHeader}>
-                  <Text className={styles.noShowShip}>{item.shipName}</Text>
-                  <Text className={styles.noShowCount}>爽约 {item.noShowCount} 次</Text>
-                </View>
-                <Text className={styles.noShowDates}>
-                  最近爽约：{formatTime(item.lastNoShowTime, 'YYYY-MM-DD HH:mm')}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
-      </View>
-    );
-  };
+  const selectedBooking = selectedBookingId
+    ? bookings.find((b) => b.id === selectedBookingId)
+    : null;
 
   return (
     <View className={styles.page}>
+      {/* Header */}
       <View className={styles.header}>
         <View className={styles.headerTop}>
           <Text className={styles.title}>值班审核</Text>
@@ -241,28 +215,28 @@ const ReviewPage: React.FC = () => {
             <Text className={styles.dateText}>📅 {selectedDate}</Text>
           </View>
         </View>
-        {dailyStats && (
-          <View className={styles.statsRow}>
-            <View className={styles.statCard}>
-              <Text className={styles.statValue}>{dailyStats.total}</Text>
-              <Text className={styles.statLabel}>今日预约</Text>
-            </View>
-            <View className={styles.statCard}>
-              <Text className={styles.statValue}>{dailyStats.approved}</Text>
-              <Text className={styles.statLabel}>已通过</Text>
-            </View>
-            <View className={styles.statCard}>
-              <Text className={styles.statValue}>{dailyStats.pending}</Text>
-              <Text className={styles.statLabel}>待审核</Text>
-            </View>
-            <View className={styles.statCard}>
-              <Text className={styles.statValue}>{dailyStats.rejected}</Text>
-              <Text className={styles.statLabel}>已拒绝</Text>
-            </View>
+
+        <View className={styles.statsRow}>
+          <View className={styles.statCard}>
+            <Text className={styles.statValue}>{dailyStats.total}</Text>
+            <Text className={styles.statLabel}>今日预约</Text>
           </View>
-        )}
+          <View className={styles.statCard}>
+            <Text className={styles.statValue}>{dailyStats.approved + dailyStats.queuing}</Text>
+            <Text className={styles.statLabel}>排队中</Text>
+          </View>
+          <View className={styles.statCard}>
+            <Text className={styles.statValue}>{dailyStats.pending}</Text>
+            <Text className={styles.statLabel}>待审核</Text>
+          </View>
+          <View className={styles.statCard}>
+            <Text className={styles.statValue}>{dailyStats.rejected}</Text>
+            <Text className={styles.statLabel}>已退回</Text>
+          </View>
+        </View>
       </View>
 
+      {/* Tabs */}
       <View className={styles.tabs}>
         {tabs.map((tab) => (
           <View
@@ -271,13 +245,14 @@ const ReviewPage: React.FC = () => {
             onClick={() => setActiveTab(tab.key)}
           >
             <Text>{tab.label}</Text>
-            {tab.status && (
-              <Text className={styles.tabCount}>{getCountByStatus(tab.status)}</Text>
+            {tab.key !== 'stats' && (
+              <Text className={styles.tabCount}>{getCount(tab.key)}</Text>
             )}
           </View>
         ))}
       </View>
 
+      {/* List */}
       <ScrollView
         className={styles.listContainer}
         scrollY
@@ -285,42 +260,26 @@ const ReviewPage: React.FC = () => {
         refresherEnabled
         refresherTriggered={isRefreshing}
       >
-        {activeTab === 'stats' ? renderStats() : renderList(activeTab)}
+        {activeTab === 'stats' ? (
+          <StatsSection
+            trendData={trendData}
+            maxValue={maxValue}
+            noShowItems={dateNoShowItems}
+            allNoShowCount={noShowItems.filter(
+              (n) => dayjs(n.bookingDate).isAfter(dayjs().subtract(30, 'day'))
+            ).length}
+          />
+        ) : (
+          <BookingsList
+            data={getFilteredBookings(activeTab)}
+            onApprove={handleApprove}
+            onReject={handleOpenReject}
+            onRecord={handleRecordPassing}
+          />
+        )}
       </ScrollView>
 
-      {showApproveModal && selectedBooking && (
-        <View className={styles.modalOverlay} onClick={() => setShowApproveModal(false)}>
-          <View className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <View className={styles.modalHeader}>
-              <Text className={styles.modalTitle}>审核通过</Text>
-            </View>
-            <View className={styles.modalBody}>
-              <Text className={styles.modalText}>
-                确定通过
-                {'\n'}
-                「{selectedBooking.shipName}」
-                {'\n'}
-                的过闸申请吗？
-              </Text>
-            </View>
-            <View className={styles.modalFooter}>
-              <Button
-                className={classnames(styles.modalBtn, styles.cancel)}
-                onClick={() => setShowApproveModal(false)}
-              >
-                取消
-              </Button>
-              <Button
-                className={classnames(styles.modalBtn, styles.confirm)}
-                onClick={handleConfirmApprove}
-              >
-                确认通过
-              </Button>
-            </View>
-          </View>
-        </View>
-      )}
-
+      {/* 退回弹窗 */}
       {showRejectModal && selectedBooking && (
         <View className={styles.modalOverlay} onClick={() => setShowRejectModal(false)}>
           <View className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -329,11 +288,11 @@ const ReviewPage: React.FC = () => {
             </View>
             <View className={styles.modalBody}>
               <Text className={styles.modalText}>
-                请填写退回「{selectedBooking.shipName}」的原因：
+                请填写「{selectedBooking.shipName}」的退回原因：
               </Text>
               <Textarea
                 className={styles.textarea}
-                placeholder="请输入退回原因，如：证件不齐全、货物信息不符等"
+                placeholder="如：证件不齐全、货物信息不符、超过预约时段等"
                 value={rejectReason}
                 onInput={(e) => setRejectReason(e.detail.value)}
                 maxlength={200}
@@ -357,28 +316,268 @@ const ReviewPage: React.FC = () => {
         </View>
       )}
 
-      <Button
-        style={{
-          position: 'fixed',
-          bottom: '140rpx',
-          right: '32rpx',
-          width: '120rpx',
-          height: '120rpx',
-          borderRadius: '60rpx',
-          background: 'linear-gradient(135deg, #FF7D00 0%, #FF9A2E 100%)',
-          color: '#fff',
-          fontSize: '24rpx',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 8rpx 24rpx rgba(255, 125, 0, 0.4)',
-        }}
-        onClick={handleToggleRole}
-      >
-        {role === 'operator' ? '切换船主' : '切换值班'}
-      </Button>
+      {/* 角色切换 */}
+      <View className={styles.fab} onClick={handleToggleRole}>
+        <Text style={{ color: '#fff', fontSize: 22, lineHeight: 1.2, textAlign: 'center' }}>
+          {role === 'operator' ? '切换\n船主' : '切换\n值班'}
+        </Text>
+      </View>
     </View>
   );
 };
+
+/* ---------- 子组件：列表 ---------- */
+interface ListProps {
+  data: Booking[];
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  onRecord: (id: string) => void;
+}
+const BookingsList: React.FC<ListProps> = ({ data, onApprove, onReject, onRecord }) => {
+  if (data.length === 0) {
+    return (
+      <View className={styles.emptyState}>
+        <Text style={{ fontSize: 80, marginBottom: 16 }}>📋</Text>
+        <Text className={styles.emptyText}>当前日期暂无此类记录</Text>
+        <Text style={{ fontSize: 22, color: '#86909c', marginTop: 8 }}>
+          可切换日期查看其他数据
+        </Text>
+      </View>
+    );
+  }
+  return data.map((b) => (
+    <View key={b.id} className={styles.reviewCard}>
+      <View className={styles.cardHeader}>
+        <View style={{ flex: 1 }}>
+          <Text className={styles.shipName}>
+            {b.shipName} · {b.lockName}
+          </Text>
+          <Text style={{ fontSize: 22, color: '#86909c', marginTop: 4 }}>
+            申请：{b.applyTime}
+          </Text>
+        </View>
+        <StatusBadgeInline status={b.status} />
+      </View>
+
+      <View className={styles.cardContent}>
+        <View className={styles.infoRow}>
+          <Text className={styles.infoLabel}>到达</Text>
+          <Text className={styles.infoValue}>
+            {b.expectedArrivalTime} ({b.timeSlot})
+          </Text>
+        </View>
+        <View className={styles.infoRow}>
+          <Text className={styles.infoLabel}>货物</Text>
+          <Text className={styles.infoValue}>
+            {cargoLabel(b.cargoType)} · {b.cargoWeight} 吨 · {b.cargoDescription}
+          </Text>
+        </View>
+        {b.specialCargo && (
+          <View style={{ marginTop: 8, padding: 10, borderRadius: 8, background: '#fff7e6' }}>
+            <Text style={{ fontSize: 22, color: '#d46b08', fontWeight: 600 }}>⚠ 特殊说明</Text>
+            <Text style={{ fontSize: 22, color: '#874d00', marginTop: 4, lineHeight: 1.6 }}>
+              {b.specialCargo}
+            </Text>
+          </View>
+        )}
+        {b.reviewer && (
+          <View className={styles.infoRow}>
+            <Text className={styles.infoLabel}>审核人</Text>
+            <Text className={styles.infoValue}>
+              {b.reviewer}
+              {b.reviewTime ? ` · ${b.reviewTime}` : ''}
+            </Text>
+          </View>
+        )}
+        {b.reviewRemark && b.status === 'rejected' && (
+          <View style={{ marginTop: 8, padding: 10, borderRadius: 8, background: '#fff1f0' }}>
+            <Text style={{ fontSize: 22, color: '#cf1322', fontWeight: 600 }}>退回原因</Text>
+            <Text style={{ fontSize: 22, color: '#5c0011', marginTop: 4, lineHeight: 1.6 }}>
+              {b.reviewRemark}
+            </Text>
+          </View>
+        )}
+        {b.actualPassTime && (
+          <View className={styles.infoRow}>
+            <Text className={styles.infoLabel}>实际过闸</Text>
+            <Text className={styles.infoValue}>{b.actualPassTime}</Text>
+          </View>
+        )}
+      </View>
+
+      <View className={styles.reviewActions}>
+        {b.status === 'pending' && (
+          <>
+            <Button
+              className={classnames(styles.actionBtn, styles.reject)}
+              onClick={() => onReject(b.id)}
+            >
+              退回
+            </Button>
+            <Button
+              className={classnames(styles.actionBtn, styles.approve)}
+              onClick={() => onApprove(b.id)}
+            >
+              通过
+            </Button>
+          </>
+        )}
+        {b.status === 'queuing' && (
+          <Button
+            className={classnames(styles.actionBtn, styles.record)}
+            onClick={() => onRecord(b.id)}
+          >
+            记录实际过闸
+          </Button>
+        )}
+        {b.status === 'approved' && (
+          <Button
+            className={classnames(styles.actionBtn, styles.record)}
+            onClick={() => onRecord(b.id)}
+          >
+            记录实际过闸
+          </Button>
+        )}
+      </View>
+    </View>
+  ));
+};
+
+/* ---------- 子组件：统计 ---------- */
+interface StatsProps {
+  trendData: { date: string; value: number; rawDate: string }[];
+  maxValue: number;
+  noShowItems: NoShowItem[];
+  allNoShowCount: number;
+}
+const StatsSection: React.FC<StatsProps> = ({ trendData, maxValue, noShowItems, allNoShowCount }) => {
+  return (
+    <View>
+      <View className={styles.chartCard}>
+        <Text className={styles.chartTitle}>近 7 日预约量趋势</Text>
+        <View className={styles.trendChart}>
+          <View className={styles.yAxis}>
+            <Text className={styles.yTick}>{maxValue}</Text>
+            <Text className={styles.yTick}>{Math.floor(maxValue / 2)}</Text>
+            <Text className={styles.yTick}>0</Text>
+          </View>
+          {trendData.map((item, i) => (
+            <View key={i} className={styles.chartBar}>
+              <View
+                className={styles.barFill}
+                style={{ height: `${(item.value / maxValue) * 100}%` }}
+              >
+                <Text className={styles.barValue}>{item.value}</Text>
+              </View>
+              <Text className={styles.barLabel}>{item.date}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View className={styles.noShowSection}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text className={styles.sectionTitle}>爽约名单</Text>
+          <Text style={{ fontSize: 22, color: '#86909c' }}>
+            近 30 天共 {allNoShowCount} 次
+          </Text>
+        </View>
+
+        {noShowItems.length === 0 ? (
+          <View className={styles.emptyState}>
+            <Text style={{ fontSize: 80, marginBottom: 16 }}>✅</Text>
+            <Text className={styles.emptyText}>该日期暂无爽约记录</Text>
+          </View>
+        ) : (
+          noShowItems.map((item) => (
+            <View key={item.id} className={styles.noShowCard}>
+              <View className={styles.noShowHeader}>
+                <Text className={styles.noShowShip}>{item.shipName}</Text>
+                <Text
+                  style={{
+                    fontSize: 22,
+                    color: '#d46b08',
+                    background: '#fff7e6',
+                    padding: '4rpx 12rpx',
+                    borderRadius: 100,
+                  }}
+                >
+                  爽约
+                </Text>
+              </View>
+              <View style={{ marginTop: 8 }}>
+                <Row label="预约日期" value={item.bookingDate} />
+                <Row label="船闸" value={`${item.lockName} · ${item.timeSlot}`} />
+                <Row label="爽约原因" value={item.reason} wrap />
+                <Row label="登记时间" value={formatTime(item.createTime)} />
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+};
+
+/* ---------- 小组件 ---------- */
+const Row: React.FC<{ label: string; value: string; wrap?: boolean }> = ({
+  label,
+  value,
+  wrap,
+}) => (
+  <View style={{ display: 'flex', marginBottom: 6 }}>
+    <Text
+      style={{
+        fontSize: 22,
+        color: '#86909c',
+        width: 120,
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </Text>
+    <Text
+      style={{
+        fontSize: 22,
+        color: '#1d2129',
+        flex: 1,
+        lineHeight: 1.6,
+        ...(wrap ? {} : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }),
+      }}
+    >
+      {value || '—'}
+    </Text>
+  </View>
+);
+
+const StatusBadgeInline: React.FC<{ status: string }> = ({ status }) => {
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    pending: { label: '待审核', color: '#d46b08', bg: '#fff7e6' },
+    approved: { label: '已通过', color: '#389e0d', bg: '#f6ffed' },
+    queuing: { label: '排队中', color: '#0958d9', bg: '#e6f4ff' },
+    rejected: { label: '已退回', color: '#cf1322', bg: '#fff1f0' },
+    cancelled: { label: '已取消', color: '#595959', bg: '#fafafa' },
+    passed: { label: '已过闸', color: '#389e0d', bg: '#f6ffed' },
+    released: { label: '已放行', color: '#531dab', bg: '#f9f0ff' },
+  };
+  const cfg = map[status] || { label: status, color: '#595959', bg: '#fafafa' };
+  return (
+    <Text
+      style={{
+        fontSize: 20,
+        color: cfg.color,
+        background: cfg.bg,
+        padding: '6rpx 16rpx',
+        borderRadius: 100,
+        fontWeight: 500,
+      }}
+    >
+      {cfg.label}
+    </Text>
+  );
+};
+
+const cargoLabel = (t: string) =>
+  ({ general: '普通货物', dangerous: '危险品', bulk: '散货', container: '集装箱', liquid: '液体货物' }[t] || t);
 
 export default ReviewPage;
