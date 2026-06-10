@@ -39,6 +39,36 @@
   font-weight: $font-weight-medium;
 }
 
+.filterRow {
+  display: flex;
+  margin-top: $spacing-sm;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  background: rgba(255, 255, 255, 0.95);
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+}
+
+.filterIcon {
+  font-size: $font-size-md;
+}
+
+.filterText {
+  font-size: $font-size-sm;
+  color: $color-primary;
+  font-weight: $font-weight-medium;
+}
+
+.filterArrow {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  margin-left: $spacing-xs;
+}
+
 .statsRow {
   display: flex;
   gap: $spacing-sm;

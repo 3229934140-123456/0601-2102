@@ -11,6 +11,8 @@ export const mockMessages: Message[] = [
     bookingId: 'bk001',
     createTime: dayjs().subtract(1, 'day').add(8, 'hour').valueOf(),
     isRead: false,
+    targetPage: '/pages/queue/index',
+    targetParams: { bookingId: 'bk001' },
   },
   {
     id: 'm002',
@@ -21,6 +23,8 @@ export const mockMessages: Message[] = [
     bookingId: 'bk004',
     createTime: dayjs().subtract(1, 'hour').valueOf(),
     isRead: false,
+    targetPage: '/pages/queue/index',
+    targetParams: { bookingId: 'bk004' },
   },
   {
     id: 'm003',
@@ -30,6 +34,8 @@ export const mockMessages: Message[] = [
     bookingId: 'bk002',
     createTime: dayjs().subtract(6, 'hour').valueOf(),
     isRead: false,
+    targetPage: '/pages/booking/index',
+    targetParams: { tab: 'pending' },
   },
   {
     id: 'm004',
@@ -40,6 +46,8 @@ export const mockMessages: Message[] = [
     bookingId: 'bk005',
     createTime: dayjs().subtract(2, 'day').valueOf(),
     isRead: true,
+    targetPage: '/pages/review/index',
+    targetParams: { tab: 'rejected', bookingId: 'bk005' },
   },
   {
     id: 'm005',
@@ -49,6 +57,8 @@ export const mockMessages: Message[] = [
     bookingId: 'bk003',
     createTime: dayjs().subtract(2, 'day').add(10, 'hour').valueOf(),
     isRead: true,
+    targetPage: '/pages/review/index',
+    targetParams: { tab: 'approved', bookingId: 'bk003' },
   },
   {
     id: 'm006',

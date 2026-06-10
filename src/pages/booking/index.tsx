@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Button, ScrollView, Input, Picker, Textarea } from '@tarojs/components';
-import Taro, { useDidShow } from '@tarojs/taro';
+import Taro, { useDidShow, getCurrentInstance } from '@tarojs/taro';
 import classnames from 'classnames';
 import dayjs from 'dayjs';
 import { useAppStore } from '@/store/appStore';
@@ -118,6 +118,18 @@ const BookingPage: React.FC = () => {
   useEffect(() => {
     if (isRefreshing) onRefresh();
   }, [isRefreshing]);
+
+  // 从 URL 参数读取 tab，用于消息跳转
+  useEffect(() => {
+    const instance = getCurrentInstance();
+    const params = instance.router?.params || {};
+    if (params.tab) {
+      const validTabs = ['all', 'pending', 'approved', 'queuing', 'passed', 'rejected', 'cancelled'];
+      if (validTabs.includes(params.tab)) {
+        setActiveTab(params.tab);
+      }
+    }
+  }, []);
 
   const defaultShip = ships.find((s) => s.id === currentShipId) || ships[0];
 

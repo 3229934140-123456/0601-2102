@@ -42,6 +42,36 @@
   font-weight: $font-weight-medium;
 }
 
+.filterBar {
+  padding: $spacing-md $page-padding 0;
+}
+
+.filterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  background: $color-bg-card;
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+}
+
+.filterIcon {
+  font-size: $font-size-md;
+}
+
+.filterText {
+  font-size: $font-size-sm;
+  color: $color-primary;
+  font-weight: $font-weight-medium;
+}
+
+.filterArrow {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  margin-left: $spacing-xs;
+}
+
 .statusCard {
   margin: $spacing-md $page-padding;
   background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);

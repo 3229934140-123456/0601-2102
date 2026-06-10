@@ -85,6 +85,8 @@ export interface Message {
   bookingId?: string;
   createTime: number;
   isRead: boolean;
+  targetPage?: string;
+  targetParams?: Record<string, string>;
 }
 
 export interface ReviewItem extends Booking {
@@ -124,6 +126,7 @@ export interface NoShowItem {
   shipId: string;
   shipName: string;
   bookingDate: string;
+  lockId: string;
   lockName: string;
   timeSlot: string;
   reason: string;

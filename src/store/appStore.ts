@@ -121,6 +121,8 @@ export const useAppStore = create<AppState>()(
           title: '预约申请已提交',
           content: `您已成功提交「${booking.shipName}」在 ${booking.lockName} ${booking.timeSlot} 的过闸申请，请等待审核。`,
           bookingId: booking.id,
+          targetPage: '/pages/booking/index',
+          targetParams: { tab: 'pending' },
         });
       },
       updateBooking: (id, updates) =>
@@ -140,6 +142,8 @@ export const useAppStore = create<AppState>()(
             title: '预约已取消',
             content: `您已取消「${booking.shipName}」在 ${booking.lockName} ${booking.timeSlot} 的过闸预约。`,
             bookingId: id,
+            targetPage: '/pages/booking/index',
+            targetParams: { tab: 'all' },
           });
         }
         get().refreshQueueFromBookings();
@@ -178,6 +182,8 @@ export const useAppStore = create<AppState>()(
           title: '预约审核通过',
           content: `恭喜！「${booking.shipName}」在 ${booking.lockName} ${booking.timeSlot} 的过闸申请已通过，排队序号：${queueNumber}。`,
           bookingId: id,
+          targetPage: '/pages/queue/index',
+          targetParams: { bookingId: id },
         });
         get().refreshQueueFromBookings();
       },
@@ -205,6 +211,8 @@ export const useAppStore = create<AppState>()(
           title: '预约审核退回',
           content: `「${booking.shipName}」在 ${booking.lockName} ${booking.timeSlot} 的过闸申请被退回。原因：${reason}`,
           bookingId: id,
+          targetPage: '/pages/review/index',
+          targetParams: { tab: 'rejected', bookingId: id },
         });
         get().refreshQueueFromBookings();
       },
@@ -231,6 +239,8 @@ export const useAppStore = create<AppState>()(
           title: '船舶已过闸',
           content: `「${booking.shipName}」于 ${timeStr} 顺利通过 ${booking.lockName}。`,
           bookingId: id,
+          targetPage: '/pages/review/index',
+          targetParams: { tab: 'approved', bookingId: id },
         });
         get().refreshQueueFromBookings();
       },

@@ -5,7 +5,7 @@ import classnames from 'classnames';
 import { useAppStore } from '@/store/appStore';
 import { mockBookings } from '@/data/booking';
 import { QueueItem, Booking } from '@/types';
-import { formatTime } from '@/utils';
+import { formatTime, getLocks } from '@/utils';
 import styles from './index.module.scss';
 
 const QueuePage: React.FC = () => {
@@ -21,6 +21,22 @@ const QueuePage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [seedLoaded, setSeedLoaded] = useState(false);
+  const [selectedLockId, setSelectedLockId] = useState<string>('all');
+
+  const locks = getLocks();
+  const lockOptions = [{ id: 'all', name: '全部船闸' }, ...locks];
+  const currentLockName = lockOptions.find((l) => l.id === selectedLockId)?.name || '全部船闸';
+
+  const handleLockChange = () => {
+    Taro.showActionSheet({
+      itemList: lockOptions.map((l) => l.name),
+      success: (res) => {
+        const newLock = lockOptions[res.tapIndex];
+        setSelectedLockId(newLock.id);
+        Taro.showToast({ title: `已切换：${newLock.name}`, icon: 'none' });
+      },
+    });
+  };
 
   const seedData = useCallback(() => {
     if (seedLoaded) return;
@@ -68,15 +84,30 @@ const QueuePage: React.FC = () => {
   }, [isRefreshing]);
 
   const currentShip = useMemo(() => getCurrentShip(), [getCurrentShip, ships, currentShipId]);
-  const sortedQueue = useMemo(
-    () => [...queueItems].sort((a, b) => a.queueNumber - b.queueNumber),
-    [queueItems]
-  );
 
-  const currentQueue = sortedQueue.find(
+  // 按船闸筛选队列，并重新计算当前船闸内的排队序号
+  const filteredQueue = useMemo(() => {
+    let list = [...queueItems];
+    if (selectedLockId !== 'all') {
+      list = list.filter((item) => {
+        const booking = bookings.find((b) => b.id === item.bookingId);
+        return booking && booking.lockId === selectedLockId;
+      });
+    }
+    return list
+      .sort((a, b) => a.queueNumber - b.queueNumber)
+      .map((item, idx) => ({
+        ...item,
+        displayNumber: idx + 1,
+        displayWaitTime: (idx + 1) * 45,
+        displayExpectedPass: new Date(Date.now() + (idx + 1) * 45 * 60 * 1000),
+      }));
+  }, [queueItems, selectedLockId, bookings]);
+
+  const currentQueue = filteredQueue.find(
     (q) => currentShip && q.shipName === currentShip.name
   );
-  const showAlert = currentQueue && currentQueue.queueNumber <= 3;
+  const showAlert = currentQueue && currentQueue.displayNumber <= 3;
 
   const passedBookings = useMemo(
     () =>
@@ -138,6 +169,14 @@ const QueuePage: React.FC = () => {
         </View>
       )}
 
+      <View className={styles.filterBar}>
+        <View className={styles.filterBtn} onClick={handleLockChange}>
+          <Text className={styles.filterIcon}>🚢</Text>
+          <Text className={styles.filterText}>{currentLockName}</Text>
+          <Text className={styles.filterArrow}>▼</Text>
+        </View>
+      </View>
+
       <ScrollView
         scrollY
         onPullDownRefresh={onRefresh}
@@ -159,7 +198,7 @@ const QueuePage: React.FC = () => {
             </View>
 
             <View className={styles.queueNumberSection}>
-              <Text className={styles.queueNumber}>{currentQueue.queueNumber}</Text>
+              <Text className={styles.queueNumber}>{currentQueue.displayNumber}</Text>
               <Text className={styles.queueLabel}>当前排队序号</Text>
             </View>
 
@@ -167,21 +206,19 @@ const QueuePage: React.FC = () => {
               <View className={styles.infoItem}>
                 <Text className={styles.infoLabel}>预计等待</Text>
                 <Text className={styles.infoValue}>
-                  {formatWaitTime(currentQueue.estimatedWaitTime)}
+                  {formatWaitTime(currentQueue.displayWaitTime)}
                 </Text>
               </View>
               <View className={styles.infoItem}>
                 <Text className={styles.infoLabel}>预计过闸</Text>
                 <Text className={styles.infoValue}>
-                  {currentQueue.expectedPassTime
-                    ? formatTime(currentQueue.expectedPassTime, 'HH:mm')
-                    : '--'}
+                  {formatTime(currentQueue.displayExpectedPass, 'HH:mm')}
                 </Text>
               </View>
               <View className={styles.infoItem}>
                 <Text className={styles.infoLabel}>前方等待</Text>
                 <Text className={styles.infoValue}>
-                  {Math.max(0, currentQueue.queueNumber - 1)}艘
+                  {Math.max(0, currentQueue.displayNumber - 1)}艘
                 </Text>
               </View>
             </View>
@@ -192,20 +229,20 @@ const QueuePage: React.FC = () => {
               <View className={styles.emptyIcon}>
                 <Text className={styles.emptyIconText}>🚢</Text>
               </View>
-              <Text className={styles.emptyText}>当前没有排队中的预约</Text>
+              <Text className={styles.emptyText}>当前船闸没有排队中的预约</Text>
               <Text className={styles.emptyDesc}>请先提交预约申请，审核通过后自动入队</Text>
             </View>
           </View>
         )}
 
-        {sortedQueue.length > 0 && (
+        {filteredQueue.length > 0 && (
           <View className={styles.section}>
             <View className={styles.sectionTitle}>
               <Text>排队列表</Text>
-              <Text className={styles.sectionCount}>共{sortedQueue.length}艘</Text>
+              <Text className={styles.sectionCount}>共{filteredQueue.length}艘</Text>
             </View>
             <View className={styles.queueList}>
-              {sortedQueue.map((item) => (
+              {filteredQueue.map((item) => (
                 <View
                   key={item.id}
                   className={classnames(
@@ -216,16 +253,16 @@ const QueuePage: React.FC = () => {
                   <View
                     className={classnames(
                       styles.queueRank,
-                      styles[getRankClass(item.queueNumber)]
+                      styles[getRankClass(item.displayNumber)]
                     )}
                   >
                     <Text
                       className={classnames(
                         styles.queueRankText,
-                        styles[getRankClass(item.queueNumber)]
+                        styles[getRankClass(item.displayNumber)]
                       )}
                     >
-                      {item.queueNumber}
+                      {item.displayNumber}
                     </Text>
                   </View>
                   <View className={styles.queueShipInfo}>
@@ -237,9 +274,7 @@ const QueuePage: React.FC = () => {
                   <View className={styles.queueTime}>
                     <Text className={styles.queueTimeLabel}>预计过闸</Text>
                     <Text className={styles.queueTimeValue}>
-                      {item.expectedPassTime
-                        ? formatTime(item.expectedPassTime, 'HH:mm')
-                        : '--:--'}
+                      {formatTime(item.displayExpectedPass, 'HH:mm')}
                     </Text>
                   </View>
                 </View>

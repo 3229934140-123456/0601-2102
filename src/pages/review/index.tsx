@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Button, ScrollView, Textarea } from '@tarojs/components';
-import Taro, { useDidShow } from '@tarojs/taro';
+import Taro, { useDidShow, getCurrentInstance } from '@tarojs/taro';
 import classnames from 'classnames';
 import dayjs from 'dayjs';
 import { useAppStore } from '@/store/appStore';
 import { mockNoShowList } from '@/data/review';
 import { mockBookings } from '@/data/booking';
 import { DailyStats, NoShowItem, Booking } from '@/types';
-import { formatTime } from '@/utils';
+import { formatTime, getLocks } from '@/utils';
 import styles from './index.module.scss';
 
 type TabKey = 'pending' | 'approved' | 'rejected' | 'queuing' | 'passed' | 'stats';
@@ -31,10 +31,17 @@ const ReviewPage: React.FC = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [seedLoaded, setSeedLoaded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedLockId, setSelectedLockId] = useState<string>('all');
+  const [showLockPicker, setShowLockPicker] = useState(false);
+
+  const locks = getLocks();
+  const lockOptions = [{ id: 'all', name: '全部船闸' }, ...locks];
+  const currentLockName = lockOptions.find((l) => l.id === selectedLockId)?.name || '全部船闸';
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'pending', label: '待审核' },
-    { key: 'approved', label: '排队中' },
+    { key: 'approved', label: '已通过' },
+    { key: 'queuing', label: '排队中' },
     { key: 'passed', label: '已过闸' },
     { key: 'rejected', label: '已拒绝' },
     { key: 'stats', label: '统计' },
@@ -60,29 +67,36 @@ const ReviewPage: React.FC = () => {
     setTimeout(() => useAppStore.getState().refreshQueueFromBookings(), 0);
   });
 
-  // 按选中日期过滤 bookings（统计和列表都基于此）
-  const dateBookings = useMemo(
-    () => bookings.filter((b) => b.bookingDate === selectedDate),
-    [bookings, selectedDate]
-  );
+  // 按选中日期和船闸过滤 bookings（统计和列表都基于此）
+  const filteredBookings = useMemo(() => {
+    let list = bookings.filter((b) => b.bookingDate === selectedDate);
+    if (selectedLockId !== 'all') {
+      list = list.filter((b) => b.lockId === selectedLockId);
+    }
+    return list;
+  }, [bookings, selectedDate, selectedLockId]);
 
   // 今日统计（动态计算，完全对得上列表）
   const dailyStats: DailyStats = useMemo(() => {
     const base = { date: selectedDate, total: 0, approved: 0, pending: 0, rejected: 0, queuing: 0, passed: 0, cancelled: 0 };
-    return dateBookings.reduce((acc, b) => {
+    return filteredBookings.reduce((acc, b) => {
       acc.total += 1;
       if (b.status in acc) (acc as any)[b.status] += 1;
       return acc;
     }, base);
-  }, [dateBookings, selectedDate]);
+  }, [filteredBookings, selectedDate]);
 
   // 已通过总数 = 所有审核通过过的（queuing 正在排队 + passed 已过闸）
   const approvedCount = dailyStats.queuing + dailyStats.passed;
 
-  // 按日期过滤的爽约名单
+  // 按日期和船闸过滤的爽约名单
   const dateNoShowItems = useMemo(() => {
-    return noShowItems.filter((n) => n.bookingDate === selectedDate);
-  }, [noShowItems, selectedDate]);
+    let list = noShowItems.filter((n) => n.bookingDate === selectedDate);
+    if (selectedLockId !== 'all') {
+      list = list.filter((n) => n.lockId === selectedLockId);
+    }
+    return list;
+  }, [noShowItems, selectedDate, selectedLockId]);
 
   // 近 7 天趋势（每日 total bookings）
   const trendData = useMemo(() => {
@@ -109,14 +123,26 @@ const ReviewPage: React.FC = () => {
     if (isRefreshing) onRefresh();
   }, [isRefreshing]);
 
+  // 从 URL 参数读取 tab，用于消息跳转
+  useEffect(() => {
+    const instance = getCurrentInstance();
+    const params = instance.router?.params || {};
+    if (params.tab) {
+      const validTabs: TabKey[] = ['pending', 'approved', 'queuing', 'passed', 'rejected', 'stats'];
+      if (validTabs.includes(params.tab as TabKey)) {
+        setActiveTab(params.tab as TabKey);
+      }
+    }
+  }, []);
+
   const getFilteredBookings = (tab: TabKey): Booking[] => {
     if (tab === 'stats') return [];
     if (tab === 'approved') {
-      return dateBookings.filter(
-        (b) => b.status === 'approved' || b.status === 'queuing'
+      return filteredBookings.filter(
+        (b) => b.status === 'approved' || b.status === 'queuing' || b.status === 'passed'
       );
     }
-    return dateBookings.filter((b) => b.status === tab);
+    return filteredBookings.filter((b) => b.status === tab);
   };
 
   const getCount = (tab: TabKey) => {
@@ -198,6 +224,17 @@ const ReviewPage: React.FC = () => {
     });
   };
 
+  const handleLockChange = () => {
+    Taro.showActionSheet({
+      itemList: lockOptions.map((l) => l.name),
+      success: (res) => {
+        const newLock = lockOptions[res.tapIndex];
+        setSelectedLockId(newLock.id);
+        Taro.showToast({ title: `已筛选：${newLock.name}`, icon: 'none' });
+      },
+    });
+  };
+
   const handleToggleRole = () => {
     Taro.showActionSheet({
       itemList: ['切换为船主', '切换为值班员'],
@@ -227,20 +264,28 @@ const ReviewPage: React.FC = () => {
           </View>
         </View>
 
+        <View className={styles.filterRow}>
+          <View className={styles.filterBtn} onClick={handleLockChange}>
+            <Text className={styles.filterIcon}>🚢</Text>
+            <Text className={styles.filterText}>{currentLockName}</Text>
+            <Text className={styles.filterArrow}>▼</Text>
+          </View>
+        </View>
+
         <View className={styles.statsRow}>
-          <View className={styles.statCard}>
+          <View className={styles.statCard} onClick={() => setActiveTab('stats')}>
             <Text className={styles.statValue}>{dailyStats.total}</Text>
             <Text className={styles.statLabel}>今日预约</Text>
           </View>
-          <View className={styles.statCard}>
+          <View className={styles.statCard} onClick={() => setActiveTab('approved')}>
             <Text className={styles.statValue}>{approvedCount}</Text>
             <Text className={styles.statLabel}>已通过</Text>
           </View>
-          <View className={styles.statCard}>
+          <View className={styles.statCard} onClick={() => setActiveTab('pending')}>
             <Text className={styles.statValue}>{dailyStats.pending}</Text>
             <Text className={styles.statLabel}>待审核</Text>
           </View>
-          <View className={styles.statCard}>
+          <View className={styles.statCard} onClick={() => setActiveTab('rejected')}>
             <Text className={styles.statValue}>{dailyStats.rejected}</Text>
             <Text className={styles.statLabel}>已拒绝</Text>
           </View>

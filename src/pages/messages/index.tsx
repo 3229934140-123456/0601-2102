@@ -81,7 +81,36 @@ const MessagesPage: React.FC = () => {
       markMessageAsRead(message.id);
     }
     setSelectedMessage(message);
-    setShowDetail(true);
+
+    if (message.targetPage) {
+      Taro.showActionSheet({
+        itemList: ['查看详情', '跳转到相关页面'],
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            setShowDetail(true);
+          } else if (res.tapIndex === 1 && message.targetPage) {
+            const params = message.targetParams || {};
+            const queryStr = Object.entries(params)
+              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+              .join('&');
+            const url = queryStr ? `${message.targetPage}?${queryStr}` : message.targetPage;
+            Taro.navigateTo({
+              url,
+              fail: () => {
+                Taro.switchTab({
+                  url: message.targetPage,
+                  fail: () => {
+                    Taro.showToast({ title: '页面跳转失败', icon: 'none' });
+                  },
+                });
+              },
+            });
+          }
+        },
+      });
+    } else {
+      setShowDetail(true);
+    }
   };
 
   const handleToggleExpand = (messageId: string, e: any) => {
