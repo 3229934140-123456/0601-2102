@@ -1,0 +1,138 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+  margin-bottom: $spacing-md;
+}
+
+.photoSection {
+  position: relative;
+  height: 300rpx;
+}
+
+.photo {
+  width: 100%;
+  height: 100%;
+}
+
+.shipTypeBadge {
+  position: absolute;
+  top: $spacing-md;
+  right: $spacing-md;
+  background: rgba(255, 255, 255, 0.95);
+  padding: $spacing-xs $spacing-md;
+  border-radius: $radius-round;
+}
+
+.shipTypeText {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-primary;
+}
+
+.infoSection {
+  padding: $spacing-lg;
+}
+
+.shipHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-lg;
+}
+
+.shipName {
+  font-size: $font-size-xxl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+}
+
+.flag {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  background: $color-bg-page;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-sm;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -$spacing-sm $spacing-lg;
+}
+
+.gridItem {
+  width: 33.33%;
+  padding: $spacing-sm;
+  box-sizing: border-box;
+}
+
+.itemLabel {
+  display: block;
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-xs;
+}
+
+.itemValue {
+  display: block;
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+}
+
+.certInfo {
+  background: $color-bg-page;
+  border-radius: $radius-sm;
+  padding: $spacing-md;
+  margin-bottom: $spacing-lg;
+}
+
+.certRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-xs 0;
+}
+
+.certLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.certValue {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.ownerInfo {
+  border-top: 1rpx solid $color-divider;
+  padding-top: $spacing-md;
+}
+
+.ownerLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-sm;
+}
+
+.ownerDetail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ownerName {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+}
+
+.ownerPhone {
+  font-size: $font-size-md;
+  color: $color-primary;
+}

@@ -1,0 +1,351 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #E3F2FD 0%, $color-bg-page 100%);
+}
+
+.alertBanner {
+  background: linear-gradient(90deg, $color-error 0%, #FF6B6B 100%);
+  padding: $spacing-md $page-padding;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.alertIcon {
+  width: 40rpx;
+  height: 40rpx;
+  background: $color-text-white;
+  border-radius: $radius-round;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.alertIconText {
+  font-size: $font-size-md;
+  color: $color-error;
+  font-weight: $font-weight-bold;
+}
+
+.alertText {
+  font-size: $font-size-md;
+  color: $color-text-white;
+  font-weight: $font-weight-medium;
+}
+
+.statusCard {
+  margin: $spacing-md $page-padding;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: $radius-lg;
+  padding: $spacing-xl;
+  box-shadow: 0 8rpx 32rpx rgba(30, 136, 229, 0.3);
+}
+
+.statusHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: $spacing-lg;
+}
+
+.lockInfo {
+  flex: 1;
+}
+
+.lockName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-white;
+}
+
+.direction {
+  font-size: $font-size-sm;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: $spacing-xs;
+}
+
+.statusBadge {
+  background: rgba(255, 255, 255, 0.25);
+  padding: $spacing-xs $spacing-md;
+  border-radius: $radius-round;
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+}
+
+.statusBadgeText {
+  font-size: $font-size-sm;
+  color: $color-text-white;
+  font-weight: $font-weight-medium;
+}
+
+.queueNumberSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: $spacing-lg 0;
+}
+
+.queueNumber {
+  font-size: 160rpx;
+  font-weight: $font-weight-bold;
+  color: $color-text-white;
+  line-height: 1;
+  text-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.2);
+}
+
+.queueLabel {
+  font-size: $font-size-md;
+  color: rgba(255, 255, 255, 0.9);
+  margin-top: $spacing-sm;
+}
+
+.statusInfo {
+  display: flex;
+  justify-content: space-around;
+  margin-top: $spacing-lg;
+  padding-top: $spacing-lg;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.2);
+}
+
+.infoItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.infoLabel {
+  font-size: $font-size-sm;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: $spacing-xs;
+}
+
+.infoValue {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-white;
+}
+
+.section {
+  padding: 0 $page-padding;
+  margin-bottom: $spacing-lg;
+}
+
+.sectionTitle {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionCount {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  font-weight: $font-weight-normal;
+}
+
+.queueList {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.queueItem {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1rpx solid $color-divider;
+  transition: all $transition-base;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:active {
+    background: $color-bg-hover;
+  }
+
+  &.current {
+    background: linear-gradient(90deg, rgba(30, 136, 229, 0.1) 0%, transparent 100%);
+    border-left: 6rpx solid $color-primary;
+  }
+}
+
+.queueRank {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: $radius-round;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: $spacing-md;
+
+  &.rank1 {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  }
+
+  &.rank2 {
+    background: linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 100%);
+  }
+
+  &.rank3 {
+    background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
+  }
+
+  &.normal {
+    background: $color-bg-page;
+  }
+}
+
+.queueRankText {
+  font-size: $font-size-md;
+  font-weight: $font-weight-bold;
+
+  &.rank1, &.rank2, &.rank3 {
+    color: $color-text-white;
+  }
+
+  &.normal {
+    color: $color-text-secondary;
+  }
+}
+
+.queueShipInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.queueShipName {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+  @include text-ellipsis;
+}
+
+.queueShipStatus {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}
+
+.queueTime {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.queueTimeLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.queueTimeValue {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-primary;
+  margin-top: $spacing-xs;
+}
+
+.historyList {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.historyItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1rpx solid $color-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.historyLeft {
+  flex: 1;
+}
+
+.historyShip {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+}
+
+.historyLock {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}
+
+.historyRight {
+  text-align: right;
+}
+
+.historyStatus {
+  font-size: $font-size-sm;
+  color: $color-success;
+  font-weight: $font-weight-medium;
+}
+
+.historyTime {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+}
+
+.emptyIcon {
+  width: 120rpx;
+  height: 120rpx;
+  background: $color-bg-page;
+  border-radius: $radius-round;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: $spacing-md;
+}
+
+.emptyIconText {
+  font-size: 60rpx;
+  color: $color-text-disabled;
+}
+
+.emptyText {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.emptyDesc {
+  font-size: $font-size-sm;
+  color: $color-text-disabled;
+  margin-top: $spacing-xs;
+}
+
+.refreshTip {
+  text-align: center;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  padding: $spacing-md;
+}

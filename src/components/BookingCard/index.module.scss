@@ -1,0 +1,154 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-md;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-md;
+  padding-bottom: $spacing-md;
+  border-bottom: 1rpx solid $color-divider;
+}
+
+.shipInfo {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.shipName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.queueBadge {
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-round;
+}
+
+.queueNumber {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+  color: $color-text-white;
+}
+
+.content {
+  gap: $spacing-sm;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  padding: $spacing-sm 0;
+
+  &.specialRow {
+    background: rgba(255, 125, 0, 0.08);
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-sm;
+    margin: $spacing-sm 0;
+  }
+
+  &.rejectRow {
+    background: rgba(245, 63, 63, 0.08);
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-sm;
+    margin: $spacing-sm 0;
+  }
+}
+
+.label {
+  width: 140rpx;
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+  flex-shrink: 0;
+}
+
+.value {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  @include text-ellipsis;
+}
+
+.specialLabel {
+  width: 140rpx;
+  font-size: $font-size-md;
+  color: $color-warning;
+  font-weight: $font-weight-medium;
+  flex-shrink: 0;
+}
+
+.specialValue {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-warning;
+}
+
+.rejectLabel {
+  width: 140rpx;
+  font-size: $font-size-md;
+  color: $color-error;
+  font-weight: $font-weight-medium;
+  flex-shrink: 0;
+}
+
+.rejectValue {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-error;
+}
+
+.footer {
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.applyTime {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.actions {
+  display: flex;
+  gap: $spacing-sm;
+}
+
+.btn {
+  @include button-reset;
+  height: $button-height-sm;
+  padding: 0 $spacing-lg;
+  border-radius: $radius-button;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  transition: all $transition-base;
+
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+
+  &.editBtn {
+    background: $color-primary;
+    color: $color-text-white;
+    border: none;
+  }
+
+  &.cancelBtn {
+    background: transparent;
+    color: $color-error;
+    border: 1rpx solid $color-error;
+  }
+}

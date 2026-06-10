@@ -1,0 +1,515 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #E3F2FD 0%, $color-bg-page 100%);
+}
+
+.header {
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  padding: $spacing-lg $page-padding;
+  padding-top: 60rpx;
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-md;
+}
+
+.title {
+  font-size: $font-size-xxl;
+  font-weight: $font-weight-bold;
+  color: $color-text-white;
+}
+
+.datePicker {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  background: rgba(255, 255, 255, 0.25);
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+}
+
+.dateText {
+  font-size: $font-size-sm;
+  color: $color-text-white;
+  font-weight: $font-weight-medium;
+}
+
+.statsRow {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-md;
+}
+
+.statCard {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.2);
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  text-align: center;
+}
+
+.statValue {
+  display: block;
+  font-size: 44rpx;
+  font-weight: $font-weight-bold;
+  color: $color-text-white;
+  line-height: 1.2;
+}
+
+.statLabel {
+  display: block;
+  font-size: $font-size-xs;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: $spacing-xs;
+}
+
+.tabs {
+  display: flex;
+  background: $color-bg-card;
+  margin: $spacing-md $page-padding;
+  border-radius: $radius-md;
+  padding: $spacing-xs;
+  box-shadow: $shadow-card;
+}
+
+.tabItem {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72rpx;
+  border-radius: $radius-sm;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  position: relative;
+
+  &.active {
+    background: $color-primary;
+    color: $color-text-white;
+    font-weight: $font-weight-medium;
+  }
+
+  &:active {
+    opacity: 0.9;
+  }
+}
+
+.tabCount {
+  margin-left: $spacing-xs;
+  font-size: 20rpx;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2rpx 10rpx;
+  border-radius: $radius-round;
+}
+
+.listContainer {
+  padding: 0 $page-padding;
+  padding-bottom: 120rpx;
+}
+
+.reviewCard {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-sm;
+  box-shadow: $shadow-card;
+  transition: all $transition-base;
+
+  &:active {
+    transform: scale(0.995);
+  }
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: $spacing-md;
+}
+
+.shipInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.shipName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  @include text-ellipsis;
+}
+
+.shipNo {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}
+
+.cardContent {
+  display: flex;
+  gap: $spacing-lg;
+  margin-bottom: $spacing-md;
+}
+
+.infoColumn {
+  flex: 1;
+  min-width: 0;
+}
+
+.infoRow {
+  display: flex;
+  margin-bottom: $spacing-sm;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.infoLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  flex-shrink: 0;
+  width: 120rpx;
+}
+
+.infoValue {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  flex: 1;
+  @include text-ellipsis;
+}
+
+.reviewActions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+}
+
+.actionBtn {
+  @include button-reset;
+  flex: 1;
+  height: $button-height-md;
+  border-radius: $radius-sm;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  transition: all $transition-base;
+
+  &:active {
+    opacity: 0.9;
+  }
+
+  &.approve {
+    background: linear-gradient(135deg, $color-success 0%, #36CFC9 100%);
+    color: $color-text-white;
+  }
+
+  &.reject {
+    background: $color-bg-secondary;
+    color: $color-error;
+    border: 1rpx solid $color-error;
+  }
+
+  &.record {
+    background: linear-gradient(135deg, $color-primary 0%, #64B5F6 100%);
+    color: $color-text-white;
+  }
+}
+
+.passInfo {
+  padding: $spacing-md;
+  background: linear-gradient(90deg, rgba(0, 180, 42, 0.08) 0%, transparent 100%);
+  border-radius: $radius-sm;
+  margin-top: $spacing-md;
+}
+
+.rejectInfo {
+  padding: $spacing-md;
+  background: linear-gradient(90deg, rgba(245, 63, 63, 0.08) 0%, transparent 100%);
+  border-radius: $radius-sm;
+  margin-top: $spacing-md;
+}
+
+.reviewerInfo {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-xs;
+}
+
+.reasonLabel {
+  font-size: $font-size-xs;
+  color: $color-error;
+  font-weight: $font-weight-medium;
+}
+
+.reasonText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-top: $spacing-xs;
+  line-height: 1.6;
+}
+
+.statsSection {
+  margin-top: $spacing-lg;
+}
+
+.sectionTitle {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.chartCard {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  box-shadow: $shadow-card;
+}
+
+.chartTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-lg;
+}
+
+.trendChart {
+  height: 300rpx;
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-sm;
+  padding-bottom: $spacing-xl;
+  position: relative;
+}
+
+.chartBar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-xs;
+}
+
+.barFill {
+  width: 100%;
+  background: linear-gradient(180deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: $radius-sm $radius-sm 0 0;
+  min-height: 8rpx;
+  transition: height $transition-base;
+  position: relative;
+
+  &:hover {
+    .barValue {
+      opacity: 1;
+    }
+  }
+}
+
+.barValue {
+  position: absolute;
+  top: -40rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: $font-size-xs;
+  color: $color-primary;
+  font-weight: $font-weight-semibold;
+  opacity: 0;
+  transition: opacity $transition-base;
+}
+
+.barLabel {
+  font-size: 20rpx;
+  color: $color-text-tertiary;
+  position: absolute;
+  bottom: -36rpx;
+}
+
+.yAxis {
+  position: absolute;
+  left: -60rpx;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 50rpx;
+}
+
+.yTick {
+  font-size: 18rpx;
+  color: $color-text-tertiary;
+  text-align: right;
+}
+
+.noShowSection {
+  margin-top: $spacing-xl;
+}
+
+.noShowCard {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-sm;
+  box-shadow: $shadow-card;
+  border-left: 6rpx solid $color-warning;
+}
+
+.noShowHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+}
+
+.noShowShip {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.noShowCount {
+  font-size: $font-size-sm;
+  color: $color-warning;
+  font-weight: $font-weight-medium;
+}
+
+.noShowDates {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  line-height: 1.6;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $page-padding;
+}
+
+.modalContent {
+  width: 100%;
+  max-width: 600rpx;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+
+.modalHeader {
+  padding: $spacing-lg;
+  border-bottom: 1rpx solid $color-divider;
+}
+
+.modalTitle {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  text-align: center;
+}
+
+.modalBody {
+  padding: $spacing-lg;
+}
+
+.modalText {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  line-height: 1.6;
+  margin-bottom: $spacing-lg;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 160rpx;
+  padding: $spacing-md;
+  background: $color-bg-secondary;
+  border: 1rpx solid $color-divider;
+  border-radius: $radius-sm;
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+
+.modalFooter {
+  display: flex;
+  padding: $spacing-md;
+  gap: $spacing-sm;
+  border-top: 1rpx solid $color-divider;
+}
+
+.modalBtn {
+  @include button-reset;
+  flex: 1;
+  height: $button-height-md;
+  border-radius: $radius-sm;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+
+  &.cancel {
+    background: $color-bg-secondary;
+    color: $color-text-secondary;
+  }
+
+  &.confirm {
+    background: $color-primary;
+    color: $color-text-white;
+  }
+
+  &.danger {
+    background: $color-error;
+    color: $color-text-white;
+  }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+}
+
+.emptyIcon {
+  font-size: 100rpx;
+  margin-bottom: $spacing-md;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.timeInfo {
+  display: flex;
+  justify-content: space-between;
+  margin-top: $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1rpx dashed $color-divider;
+}
+
+.timeLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.timeValue {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  font-weight: $font-weight-medium;
+}

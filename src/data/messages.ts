@@ -1,0 +1,67 @@
+import { Message } from '@/types';
+import dayjs from 'dayjs';
+
+export const mockMessages: Message[] = [
+  {
+    id: 'msg001',
+    type: 'queue',
+    title: '放行提醒',
+    content: '您的船舶「长江之星」已排到第3位，预计2小时后可以过闸，请做好准备。',
+    bookingId: 'bk001',
+    createTime: dayjs().subtract(10, 'minute').format('YYYY-MM-DD HH:mm'),
+    isRead: false,
+  },
+  {
+    id: 'msg002',
+    type: 'review',
+    title: '预约审核通过',
+    content: '您的预约申请「bk004」已审核通过，请按时到达「三峡升船机」。',
+    bookingId: 'bk004',
+    createTime: dayjs().subtract(12, 'hour').format('YYYY-MM-DD HH:mm'),
+    isRead: false,
+  },
+  {
+    id: 'msg003',
+    type: 'booking',
+    title: '预约提交成功',
+    content: '您的预约申请「bk002」已提交成功，等待值班人员审核。',
+    bookingId: 'bk002',
+    createTime: dayjs().subtract(6, 'hour').format('YYYY-MM-DD HH:mm'),
+    isRead: true,
+  },
+  {
+    id: 'msg004',
+    type: 'review',
+    title: '预约审核退回',
+    content: '您的预约申请「bk005」被退回，原因：危险品申报资料不全，请补充安全运输许可证。',
+    bookingId: 'bk005',
+    createTime: dayjs().subtract(2, 'day').format('YYYY-MM-DD HH:mm'),
+    isRead: true,
+  },
+  {
+    id: 'msg005',
+    type: 'system',
+    title: '系统维护通知',
+    content: '系统将于2026-06-15 22:00-24:00进行维护升级，届时预约功能将暂停服务，请提前做好安排。',
+    createTime: dayjs().subtract(3, 'day').format('YYYY-MM-DD HH:mm'),
+    isRead: true,
+  },
+  {
+    id: 'msg006',
+    type: 'queue',
+    title: '过闸完成',
+    content: '您的船舶「长江之星」已于2026-06-08 10:30顺利通过三峡船闸。',
+    bookingId: 'bk003',
+    createTime: dayjs().subtract(2, 'day').format('YYYY-MM-DD HH:mm'),
+    isRead: true,
+  },
+  {
+    id: 'msg007',
+    type: 'booking',
+    title: '预约已取消',
+    content: '您的预约申请「bk008」已成功取消。',
+    bookingId: 'bk008',
+    createTime: dayjs().subtract(4, 'day').format('YYYY-MM-DD HH:mm'),
+    isRead: true,
+  },
+];
